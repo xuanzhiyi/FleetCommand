@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(del \"C:\\\\Users\\\\xuanz\\\\source\\\\repos\\\\FleetCommand\\\\FleetCommand\\\\Ships.cs\")"
+    ]
+  }
+}
