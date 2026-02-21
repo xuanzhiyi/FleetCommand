@@ -228,8 +228,10 @@ namespace FleetCommand
                 {
                     if (Dist(ps.Position, ps.AttackTarget.Position) <= range)
                     {
-                        ps.AttackTarget.HP -= dmg;
-                        ps.HP -= ps.AttackTarget.GetDamage() * 0.5f;
+                        float mult = GameConstants.GetCombatMultiplier(ps.Type, ps.AttackTarget.Type);
+                        ps.AttackTarget.HP -= dmg * mult;
+                        float retMult = GameConstants.GetCombatMultiplier(ps.AttackTarget.Type, ps.Type);
+                        ps.HP -= ps.AttackTarget.GetDamage() * retMult * 0.5f;
                         SpawnEffect(ps.Position, ps.AttackTarget.Position, ps.Type, true);
                         if (!ps.AttackTarget.IsAlive)
                         {
@@ -243,8 +245,10 @@ namespace FleetCommand
                 {
                     if (Dist(ps.Position, es.Position) <= range)
                     {
-                        es.HP -= dmg * 0.5f;
-                        ps.HP -= es.GetDamage() * 0.3f;
+                        float mult    = GameConstants.GetCombatMultiplier(ps.Type, es.Type);
+                        float retMult = GameConstants.GetCombatMultiplier(es.Type, ps.Type);
+                        es.HP -= dmg * mult * 0.5f;
+                        ps.HP -= es.GetDamage() * retMult * 0.3f;
                         SpawnEffect(ps.Position, es.Position, ps.Type, true);
                     }
                 }
@@ -261,7 +265,8 @@ namespace FleetCommand
                 {
                     if (Dist(es.Position, es.AttackTarget.Position) <= range)
                     {
-                        es.AttackTarget.HP -= dmg;
+                        float mult = GameConstants.GetCombatMultiplier(es.Type, es.AttackTarget.Type);
+                        es.AttackTarget.HP -= dmg * mult;
                         SpawnEffect(es.Position, es.AttackTarget.Position, es.Type, false);
                     }
                     continue;
@@ -271,7 +276,8 @@ namespace FleetCommand
                     if (ps.Type == ShipType.Miner || ps.Type == ShipType.ResourceCollector) continue;
                     if (Dist(es.Position, ps.Position) <= range)
                     {
-                        ps.HP -= dmg * 0.4f;
+                        float mult = GameConstants.GetCombatMultiplier(es.Type, ps.Type);
+                        ps.HP -= dmg * mult * 0.4f;
                         SpawnEffect(es.Position, ps.Position, es.Type, false);
                     }
                 }
@@ -354,6 +360,14 @@ namespace FleetCommand
             int cost = GameConstants.BuildCosts[(int)type];
             if (PlayerResources < cost) return false;
             if (PlayerMothership.BuildQueue.Count >= 5) return false;
+
+            // Fleet cap: count live ships + queued spawns for this type
+            int cap         = GameConstants.FleetCaps[(int)type];
+            int spawnCount  = (type == ShipType.Interceptor || type == ShipType.Bomber) ? 5 : 1;
+            int live        = Ships.Count(s => s.IsAlive && s.TeamId == 0 && s.Type == type);
+            int queued      = PlayerMothership.BuildQueue.Count(q => q.Type == type) * spawnCount;
+            if (live + queued + spawnCount > cap) return false;
+
             PlayerResources -= cost;
             PlayerMothership.BuildQueue.Add(new BuildOrder(type, 1.0f));
             LogEvent($"Building {type}... Cost: {cost} resources");

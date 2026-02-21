@@ -352,7 +352,7 @@ namespace FleetCommand
                 btn.Click += (s, e) =>
                 {
                     if (!world.TryBuildShip((ShipType)((Button)s).Tag))
-                        MessageBox.Show("Not enough resources or build queue full!",
+                        MessageBox.Show("Not enough resources, queue is full, or fleet cap reached!",
                             "Cannot Build", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     this.Focus();
                 };
@@ -879,17 +879,87 @@ namespace FleetCommand
                     if (miners.Count > 0) { world.AssignMiners(miners, ast); world.LogEvent($"{miners.Count} miner(s) → asteroid"); return; }
                 }
 
-                int cnt = selectedShips.Count;
-                for (int i = 0; i < cnt; i++)
+                // Separate combat ships (delta formation) from non-combat (circle spread)
+                var fighters    = new List<Ship>();
+                var nonFighters = new List<Ship>();
+                foreach (var s in selectedShips)
                 {
-                    selectedShips[i].AttackTarget = null;
-                    float spread = Math.Min(cnt * 12f, 80f);
-                    double angle = i * Math.PI * 2 / cnt;
-                    selectedShips[i].Destination = new PointF(
+                    if (!s.IsAlive) continue;
+                    ShipType t = s.Type;
+                    if (t == ShipType.Interceptor || t == ShipType.Bomber   ||
+                        t == ShipType.Corvet      || t == ShipType.Frigate  ||
+                        t == ShipType.Destroyer   || t == ShipType.Battlecruiser)
+                        fighters.Add(s);
+                    else
+                        nonFighters.Add(s);
+                }
+
+                // ── Non-combat: original circle spread ────────────────────────
+                int nfCnt = nonFighters.Count;
+                for (int i = 0; i < nfCnt; i++)
+                {
+                    nonFighters[i].AttackTarget = null;
+                    float spread = Math.Min(nfCnt * 12f, 80f);
+                    double angle = i * Math.PI * 2 / nfCnt;
+                    nonFighters[i].Destination = new PointF(
                         worldPt.X + (float)Math.Cos(angle) * spread,
                         worldPt.Y + (float)Math.Sin(angle) * spread);
-                    selectedShips[i].IsMining = false;
-                    selectedShips[i].ReturningToMothership = false;
+                    nonFighters[i].IsMining = false;
+                    nonFighters[i].ReturningToMothership = false;
+                }
+
+                // ── Combat ships: DELTA formation, groups of ≤5 ───────────────
+                if (fighters.Count > 0)
+                {
+                    // Compute forward direction (centroid → worldPt)
+                    float cx = 0f, cy = 0f;
+                    foreach (var f in fighters) { cx += f.Position.X; cy += f.Position.Y; }
+                    cx /= fighters.Count; cy /= fighters.Count;
+
+                    float fdx = worldPt.X - cx, fdy = worldPt.Y - cy;
+                    float fdist = (float)Math.Sqrt(fdx * fdx + fdy * fdy);
+                    PointF fwd   = fdist < 1f
+                        ? new PointF(1f, 0f)
+                        : new PointF(fdx / fdist, fdy / fdist);
+                    PointF right = new PointF(fwd.Y, -fwd.X);   // 90° clockwise
+
+                    // Delta slot offsets: (rightward, rearward) in world units
+                    // Slot 0 = tip (at groupCenter), slots 1-4 trail behind
+                    var slots = new PointF[]
+                    {
+                        new PointF(  0f,   0f),   // tip
+                        new PointF(-20f,  20f),   // left wing
+                        new PointF( 20f,  20f),   // right wing
+                        new PointF(-40f,  40f),   // left rear
+                        new PointF( 40f,  40f),   // right rear
+                    };
+
+                    const int   grpMax     = 5;
+                    const float grpSpacing = 110f;
+                    int numGroups = (fighters.Count + grpMax - 1) / grpMax;
+
+                    for (int gi = 0; gi < numGroups; gi++)
+                    {
+                        // Spread groups perpendicularly so they don't stack
+                        float gOff = (gi - (numGroups - 1) / 2.0f) * grpSpacing;
+                        PointF gCenter = new PointF(
+                            worldPt.X + gOff * right.X,
+                            worldPt.Y + gOff * right.Y);
+
+                        int start = gi * grpMax;
+                        int end   = Math.Min(start + grpMax, fighters.Count);
+                        for (int si = start; si < end; si++)
+                        {
+                            PointF slot = slots[si - start];
+                            // slot.X along right, slot.Y opposite to fwd (rearward)
+                            fighters[si].AttackTarget = null;
+                            fighters[si].Destination  = new PointF(
+                                gCenter.X + slot.X * right.X - slot.Y * fwd.X,
+                                gCenter.Y + slot.X * right.Y - slot.Y * fwd.Y);
+                            fighters[si].IsMining = false;
+                            fighters[si].ReturningToMothership = false;
+                        }
+                    }
                 }
             }
         }

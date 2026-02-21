@@ -107,7 +107,7 @@ namespace FleetCommand
             // Phase 0: economy first — build miners until target reached
             if (miners < targetMiners && Resources >= GameConstants.BuildCosts[(int)ShipType.Miner])
             {
-                QueueBuild(ShipType.Miner);
+                QueueBuild(ShipType.Miner, allShips);
                 return;
             }
 
@@ -115,7 +115,7 @@ namespace FleetCommand
             if (GameConstants.AiUsesCollectors[Idx] && colls < 1 + miners / 5
                 && Resources >= GameConstants.BuildCosts[(int)ShipType.ResourceCollector])
             {
-                QueueBuild(ShipType.ResourceCollector);
+                QueueBuild(ShipType.ResourceCollector, allShips);
                 return;
             }
 
@@ -124,7 +124,7 @@ namespace FleetCommand
             {
                 ShipType choice = PickCombatShip(combat, miners);
                 if (Resources >= GameConstants.BuildCosts[(int)choice])
-                    QueueBuild(choice);
+                    QueueBuild(choice, allShips);
             }
         }
 
@@ -212,10 +212,19 @@ namespace FleetCommand
                            Level == AiLevel.Hard    ? "Hard AI" : "Expert AI";
         }
 
-        private void QueueBuild(ShipType type)
+        private void QueueBuild(ShipType type, List<Ship> allShips)
         {
             int cost = GameConstants.BuildCosts[(int)type];
             if (Resources < cost) return;
+            if (Mothership.BuildQueue.Count >= GameConstants.AiBuildQueueMax[Idx]) return;
+
+            // Fleet cap: count live ships + queued spawns for this type on our team
+            int cap        = GameConstants.FleetCaps[(int)type];
+            int spawnCount = (type == ShipType.Interceptor || type == ShipType.Bomber) ? 5 : 1;
+            int live       = allShips.Count(s => s.IsAlive && s.TeamId == Mothership.TeamId && s.Type == type);
+            int queued     = Mothership.BuildQueue.Count(q => q.Type == type) * spawnCount;
+            if (live + queued + spawnCount > cap) return;
+
             Resources -= cost;
             Mothership.BuildQueue.Add(new BuildOrder(type, 1.0f));
         }

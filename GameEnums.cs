@@ -48,6 +48,49 @@ namespace FleetCommand
         public const float DockRepairRate        = 15.0f;
         public const float DockRange             = 60f;
 
+        // ── Fleet caps per ship type (max ships per team) ─────────────────────
+        // Indexed by ShipType: Mothership, Miner, Interceptor, Bomber, Corvet,
+        //                      Frigate, Destroyer, Battlecruiser, ResourceCollector
+        public static readonly int[] FleetCaps = {
+            1, 20, 50, 40, 30, 20, 8, 5, 4
+        };
+
+        // ── Combat multipliers (strong / weak against) ────────────────────────
+        /// <summary>
+        /// Returns the damage multiplier when <paramref name="attacker"/> hits <paramref name="target"/>.
+        /// Strong = ×1.75  |  Weak = ×0.60  |  Normal = ×1.00
+        /// </summary>
+        public static float GetCombatMultiplier(ShipType attacker, ShipType target)
+        {
+            // ── Strong against (+75 %) ────────────────────────────────────────
+            if (attacker == ShipType.Interceptor &&
+                target   == ShipType.Bomber)                                     return 1.75f;
+
+            if (attacker == ShipType.Bomber &&
+                (target == ShipType.Mothership || target == ShipType.Battlecruiser)) return 1.75f;
+
+            if (attacker == ShipType.Destroyer &&
+                target   == ShipType.Frigate)                                    return 1.75f;
+
+            if (attacker == ShipType.Battlecruiser &&
+                (target == ShipType.Destroyer || target == ShipType.Frigate))   return 1.75f;
+
+            // ── Weak against (−40 %) ──────────────────────────────────────────
+            if (attacker == ShipType.Bomber &&
+                target   == ShipType.Interceptor)                                return 0.60f;
+
+            if ((attacker == ShipType.Mothership || attacker == ShipType.Battlecruiser) &&
+                target   == ShipType.Bomber)                                     return 0.60f;
+
+            if (attacker == ShipType.Frigate &&
+                target   == ShipType.Destroyer)                                  return 0.60f;
+
+            if ((attacker == ShipType.Destroyer || attacker == ShipType.Frigate) &&
+                target   == ShipType.Battlecruiser)                              return 0.60f;
+
+            return 1.0f;
+        }
+
         // ── AI strategy parameters (indexed by AiLevel) ──────────────────────
         // All values affect decision-making only — no stat cheating.
         public static readonly int[]  AiTargetMiners          = { 3,  5,  7, 10 };

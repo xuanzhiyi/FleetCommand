@@ -186,11 +186,34 @@ namespace FleetCommand
         }
     }
 
-    // ── Mothership (oval) ──────────────────────────────────────────────────────
+    // ── Mothership (oval / sprite) ────────────────────────────────────────────
     public class Mothership : Ship
     {
         public List<BuildOrder> BuildQueue { get; } = new List<BuildOrder>();
 
+        // ── Sprite support ────────────────────────────────────────────────────
+        // The sprite is loaded once per process and shared across all Mothership
+        // instances.  Black / near-black pixels are keyed out at draw time via
+        // ImageAttributes — the original Bitmap is never modified.
+        private static Bitmap _sprite;
+        private static readonly object _spriteLock = new object();
+
+        private static Bitmap GetSprite()
+        {
+            if (_sprite != null) return _sprite;
+            lock (_spriteLock)
+            {
+                if (_sprite != null) return _sprite;
+                try { _sprite = new Bitmap(Properties.Resources.mothership); }
+                catch { _sprite = null; }   // falls back to ellipse if image missing
+            }
+            return _sprite;
+        }
+
+        // Zoom level at which the sprite is shown instead of the plain ellipse.
+        private const float SpriteZoom = 0.8f;
+
+        // ─────────────────────────────────────────────────────────────────────
         public Mothership(PointF position, bool isPlayer) : base(ShipType.Mothership, position, isPlayer)
         {
             Label = "Mothership";
@@ -198,28 +221,70 @@ namespace FleetCommand
 
         public override void Draw(Graphics g, PointF offset, float zoom)
         {
-            float sx = (Position.X + offset.X) * zoom;
-            float sy = (Position.Y + offset.Y) * zoom;
-            float rx = 40 * zoom, ry = 25 * zoom;
+            float sx    = (Position.X + offset.X) * zoom;
+            float sy    = (Position.Y + offset.Y) * zoom;
+            float rx    = 40 * zoom, ry = 25 * zoom;
             var   color = GetShipColor();
-            using (var pen   = new Pen(color, IsSelected ? 2.5f : 1.5f))
-            using (var brush = new SolidBrush(Color.FromArgb(60, color)))
+
+            if (zoom >= SpriteZoom)
             {
-                g.FillEllipse(brush, sx - rx, sy - ry, rx * 2, ry * 2);
-                g.DrawEllipse(pen,   sx - rx, sy - ry, rx * 2, ry * 2);
-                // Engine glow
-                var glowColor = Destination.HasValue
-                    ? Color.FromArgb(160, Color.Cyan)
-                    : Color.FromArgb(80, Color.Cyan);
-                g.FillEllipse(new SolidBrush(glowColor), sx - rx * 0.35f, sy + ry * 0.25f, rx * 0.7f, ry * 0.7f);
+                // ── Sprite mode ───────────────────────────────────────────────
+                var sprite = GetSprite();
+                if (sprite != null)
+                {
+                    // Draw square sprite centred on the ship; scale with zoom.
+                    // rx * 2.4 gives a nicely-sized image slightly larger than
+                    // the underlying ellipse (80 world-units wide at zoom = 1).
+                    float sz      = rx * 2.4f;
+                    var   dest    = new Rectangle((int)(sx - sz * 0.5f),
+                                                  (int)(sy - sz * 0.35f),
+                                                  (int)sz, (int)(sz*0.7f));
+
+                    using (var ia = new System.Drawing.Imaging.ImageAttributes())
+                    {
+                        // Key out near-black background (0,0,0) → (20,20,20)
+                        ia.SetColorKey(Color.FromArgb(0, 0, 0),
+                                       Color.FromArgb(20, 20, 20));
+                        g.DrawImage(sprite, dest,
+                                    0, 0, sprite.Width, sprite.Height,
+                                    GraphicsUnit.Pixel, ia);
+                    }
+                }
+
+                // Team-coloured ellipse ring overlaid on the sprite so ownership
+                // is always readable; brightens when selected.
+                int ringAlpha = IsSelected ? 220 : 90;
+                using (var pen = new Pen(Color.FromArgb(ringAlpha, color),
+                                         IsSelected ? 2.5f : 1.5f))
+                    g.DrawEllipse(pen, sx - rx, sy - ry, rx * 2, ry * 2);
             }
+            else
+            {
+                // ── Ellipse mode (zoomed out) ─────────────────────────────────
+                using (var pen   = new Pen(color, IsSelected ? 2.5f : 1.5f))
+                using (var brush = new SolidBrush(Color.FromArgb(60, color)))
+                {
+                    g.FillEllipse(brush, sx - rx, sy - ry, rx * 2, ry * 2);
+                    g.DrawEllipse(pen,   sx - rx, sy - ry, rx * 2, ry * 2);
+                }
+            }
+
+            // Engine glow — drawn in both modes
+            //var glowColor = Destination.HasValue
+            //    ? Color.FromArgb(160, Color.Cyan)
+            //    : Color.FromArgb(80,  Color.Cyan);
+            //g.FillEllipse(new SolidBrush(glowColor),
+            //              sx - rx * 0.35f, sy + ry * 0.25f, rx * 0.7f, ry * 0.7f);
+
             // Docking ring when fighters are repairing
             if (IsDocking)
             {
                 float dr = (GameConstants.DockRange + 8) * zoom;
-                using (var pen = new Pen(Color.FromArgb(140, Color.LimeGreen), 1.5f) { DashStyle = DashStyle.Dot })
+                using (var pen = new Pen(Color.FromArgb(140, Color.LimeGreen), 1.5f)
+                                     { DashStyle = DashStyle.Dot })
                     g.DrawEllipse(pen, sx - dr, sy - dr, dr * 2, dr * 2);
             }
+
             DrawHealthBar(g, new RectangleF(sx - rx, sy - ry, rx * 2, ry * 2));
             DrawLabel(g, new PointF(sx, sy), ry);
         }
@@ -540,17 +605,38 @@ namespace FleetCommand
         }
     }
 
-    // ── Battlecruiser (hexagon-ish) ───────────────────────────────────────────
+    // ── Battlecruiser (hexagon-ish / sprite) ─────────────────────────────────
     public class Battlecruiser : Ship
     {
         public Battlecruiser(PointF position, bool isPlayer) : base(ShipType.Battlecruiser, position, isPlayer) { Label = "Battlecruiser"; }
 
+        // ── Sprite support ────────────────────────────────────────────────────
+        private static Bitmap _sprite;
+        private static readonly object _spriteLock = new object();
+
+        private static Bitmap GetSprite()
+        {
+            if (_sprite != null) return _sprite;
+            lock (_spriteLock)
+            {
+                if (_sprite != null) return _sprite;
+                try { _sprite = new Bitmap(Properties.Resources.Battlecruiser2); }
+                catch { _sprite = null; }   // falls back to polygon if image missing
+            }
+            return _sprite;
+        }
+
+        private const float SpriteZoom = 0.8f;
+
+        // ─────────────────────────────────────────────────────────────────────
         public override void Draw(Graphics g, PointF offset, float zoom)
         {
-            float sx   = (Position.X + offset.X) * zoom;
-            float sy   = (Position.Y + offset.Y) * zoom;
-            float w    = 35 * zoom, h = 18 * zoom, skew = 12 * zoom;
+            float sx    = (Position.X + offset.X) * zoom;
+            float sy    = (Position.Y + offset.Y) * zoom;
+            float w     = 35 * zoom, h = 18 * zoom, skew = 12 * zoom;
             var   color = GetShipColor();
+
+            // Polygon points — used for the outline overlay and the fallback shape
             var pts = new PointF[]
             {
                 new PointF(sx - w - skew, sy + h),
@@ -561,18 +647,52 @@ namespace FleetCommand
                 new PointF(sx - w + skew, sy),
                 new PointF(sx - w - skew, sy + h),
             };
-            using (var pen   = new Pen(color, IsSelected ? 2.5f : 1.5f))
-            using (var brush = new SolidBrush(Color.FromArgb(60, color)))
+
+            if (zoom >= SpriteZoom)
             {
-                g.FillPolygon(brush, pts);
-                g.DrawPolygon(pen, pts);
-                g.DrawLine(new Pen(Color.FromArgb(100, color), 1),
-                    new PointF(sx - w * 0.5f + skew * 0.5f, sy - h),
-                    new PointF(sx - w * 0.5f - skew * 0.5f, sy + h));
-                g.DrawLine(new Pen(Color.FromArgb(100, color), 1),
-                    new PointF(sx + w * 0.5f + skew * 0.5f, sy - h),
-                    new PointF(sx + w * 0.5f - skew * 0.5f, sy + h));
+                // ── Sprite mode ───────────────────────────────────────────────
+                var sprite = GetSprite();
+                if (sprite != null)
+                {
+                    // Sprite sized to the full polygon width (w + skew on each side)
+                    float sz   = (w + skew) * 1.9f;
+                    var   dest = new Rectangle((int)(sx - sz * 0.5f),
+                                               (int)(sy - sz * 0.4f),
+                                               (int)sz, (int)(sz * 0.8f));
+
+                    using (var ia = new System.Drawing.Imaging.ImageAttributes())
+                    {
+                        ia.SetColorKey(Color.FromArgb(0, 0, 0),
+                                       Color.FromArgb(20, 20, 20));
+                        g.DrawImage(sprite, dest,
+                                    0, 0, sprite.Width, sprite.Height,
+                                    GraphicsUnit.Pixel, ia);
+                    }
+                }
+
+                // Team-coloured polygon outline over the sprite
+                int ringAlpha = IsSelected ? 220 : 90;
+                using (var pen = new Pen(Color.FromArgb(ringAlpha, color),
+                                         IsSelected ? 2.5f : 1.5f))
+                    g.DrawPolygon(pen, pts);
             }
+            else
+            {
+                // ── Polygon mode (zoomed out) ─────────────────────────────────
+                using (var pen   = new Pen(color, IsSelected ? 2.5f : 1.5f))
+                using (var brush = new SolidBrush(Color.FromArgb(60, color)))
+                {
+                    g.FillPolygon(brush, pts);
+                    g.DrawPolygon(pen, pts);
+                    g.DrawLine(new Pen(Color.FromArgb(100, color), 1),
+                        new PointF(sx - w * 0.5f + skew * 0.5f, sy - h),
+                        new PointF(sx - w * 0.5f - skew * 0.5f, sy + h));
+                    g.DrawLine(new Pen(Color.FromArgb(100, color), 1),
+                        new PointF(sx + w * 0.5f + skew * 0.5f, sy - h),
+                        new PointF(sx + w * 0.5f - skew * 0.5f, sy + h));
+                }
+            }
+
             // Docking ring when repairing fighters
             if (IsDocking)
             {

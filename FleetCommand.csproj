@@ -90,10 +90,15 @@
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <!-- bgmusic.wav embedded directly so GetManifestResourceStream works -->
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Resources\Battlecruiser2.jpg" />
+    <Content Include="Resources\Mothership.jpg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Resources\wallpaper2.jpg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
