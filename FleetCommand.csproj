@@ -106,6 +106,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Resources\Battlecruiser2.jpg" />
+    <Content Include="Resources\Destroyer.jpg" />
     <Content Include="Resources\Mothership.jpg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

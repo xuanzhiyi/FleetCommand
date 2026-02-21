@@ -27,7 +27,7 @@ namespace FleetCommand
             0, 5000, 6000, 10000, 12000, 15000, 30000, 45000, 12000
         };
         public static readonly int[] MaxHP = {
-            25000, 100, 200, 220, 260, 500, 3000, 10000, 600
+            12000, 100, 200, 220, 260, 500, 3000, 10000, 600
         };
         public static readonly float[] Damage = {
             1.0f, 0, 0.3f, 0.5f, 0.4f, 0.7f, 1.2f, 2.5f, 0
@@ -66,10 +66,16 @@ namespace FleetCommand
             if (attacker == ShipType.Interceptor &&
                 target   == ShipType.Bomber)                                     return 1.75f;
 
-            if (attacker == ShipType.Bomber &&
-                (target == ShipType.Mothership || target == ShipType.Battlecruiser)) return 1.75f;
+			if (attacker == ShipType.Corvet &&
+				(target == ShipType.Interceptor || target == ShipType.Bomber)) return 1.75f;
 
-            if (attacker == ShipType.Destroyer &&
+			if (attacker == ShipType.Bomber &&
+                (target == ShipType.Mothership || target == ShipType.Battlecruiser || target == ShipType.Destroyer)) return 1.75f;
+
+			if (attacker == ShipType.Frigate &&
+				target == ShipType.Corvet)                                       return 1.75f;
+
+			if (attacker == ShipType.Destroyer &&
                 target   == ShipType.Frigate)                                    return 1.75f;
 
             if (attacker == ShipType.Battlecruiser &&
@@ -79,7 +85,7 @@ namespace FleetCommand
             if (attacker == ShipType.Bomber &&
                 target   == ShipType.Interceptor)                                return 0.60f;
 
-            if ((attacker == ShipType.Mothership || attacker == ShipType.Battlecruiser) &&
+            if ((attacker == ShipType.Mothership || attacker == ShipType.Battlecruiser || attacker == ShipType.Destroyer) &&
                 target   == ShipType.Bomber)                                     return 0.60f;
 
             if (attacker == ShipType.Frigate &&
