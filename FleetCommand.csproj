@@ -61,7 +61,13 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Battlecruiser.cs" />
+    <Compile Include="Corvet.cs" />
+    <Compile Include="Destroyer.cs" />
+    <Compile Include="Frigate.cs" />
     <Compile Include="LoopStream.cs" />
+    <Compile Include="Miner.cs" />
+    <Compile Include="Mothership.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="GameEnums.cs" />
     <Compile Include="CombatEffect.cs" />
@@ -72,6 +78,9 @@
     </Compile>
     <Compile Include="ResearchManager.cs" />
     <!-- ResearchPanel + BuildMenuPanel merged into GameForm.cs as docked inline tabs -->
+    <Compile Include="ResourceCollector.cs" />
+    <Compile Include="Ship.cs" />
+    <Compile Include="ShipFactory.cs" />
     <Compile Include="Ships.cs" />
     <Compile Include="EnemyAI.cs" />
     <Compile Include="Asteroid.cs" />
@@ -82,6 +91,7 @@
     <Compile Include="MainMenuForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="TriangleShip.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="GameForm.resx">
