@@ -98,6 +98,19 @@ namespace FleetCommand
             return completed;
         }
 
+        // ── Speed multiplier helper ──────────────────────────────────────────────
+
+        /// <summary>Cumulative speed multiplier for a given upgrade level (0 = base).</summary>
+        private float GetSpeedMultiplier(int level)
+        {
+            if (level <= 0) return 1f;
+            float m = 1f + SpeedBonusPerLevel;                    // Mk.I
+            if (level == 1) return m;
+            m *= 1f + SpeedBonusPerLevel * 0.85f;                 // Mk.II
+            if (level == 2) return m;
+            return m * (1f + SpeedBonusPerLevel * 0.70f);         // Mk.III
+        }
+
         // ── Apply bonuses to a newly spawned ship ────────────────────────────────
 
         public void ApplyTo(Ship ship)
@@ -105,23 +118,41 @@ namespace FleetCommand
             int level = Levels[ship.Type];
             if (level == 0) return;
 
-            // Hull: +20% per level of base HP
-            float hullMult   = 1f + HullBonusPerLevel * level;
-            float damageMult = 1f + DamageBonusPerLevel * level;
-            ship.MaxHPValue *= hullMult;
-            ship.HP          = ship.MaxHPValue;
-            ship.Damage     *= damageMult;
+            ship.MaxHPValue *= 1f + HullBonusPerLevel   * level;
+            ship.HP          = ship.MaxHPValue;               // new ship: full HP
+            ship.Damage     *= 1f + DamageBonusPerLevel * level;
+            ship.ApplySpeedMultiplier(GetSpeedMultiplier(level));
+        }
 
-            // Speed: +12% Mk.I, slight friction each subsequent level
-            float speedMult;
-            if (level == 1)
-                speedMult = 1f + SpeedBonusPerLevel;
-            else if (level == 2)
-                speedMult = (1f + SpeedBonusPerLevel) * (1f + SpeedBonusPerLevel * 0.85f);
-            else // level 3
-                speedMult = (1f + SpeedBonusPerLevel) * (1f + SpeedBonusPerLevel * 0.85f) * (1f + SpeedBonusPerLevel * 0.70f);
+        // ── Retrofit an existing ship from one level to another ───────────────────
 
-            ship.ApplySpeedMultiplier(speedMult);
+        /// <summary>
+        /// Applies the incremental stat delta between <paramref name="fromLevel"/> and
+        /// <paramref name="toLevel"/> to a ship that is already in the field.
+        /// Unlike <see cref="ApplyTo"/>, this preserves the ship's current HP ratio
+        /// (a damaged ship stays damaged — it is not healed to full).
+        /// Also updates <see cref="Ship.UpgradeLevel"/> to <paramref name="toLevel"/>.
+        /// </summary>
+        public void ApplyUpgradeDelta(Ship ship, int fromLevel, int toLevel)
+        {
+            if (fromLevel >= toLevel) return;
+
+            // Hull — scale MaxHP by the ratio of new/old multiplier, keep HP ratio
+            float oldH    = 1f + HullBonusPerLevel * fromLevel;
+            float newH    = 1f + HullBonusPerLevel * toLevel;
+            float hpRatio = ship.MaxHPValue > 0 ? ship.HP / ship.MaxHPValue : 1f;
+            ship.MaxHPValue *= newH / oldH;
+            ship.HP          = ship.MaxHPValue * hpRatio;
+
+            // Damage
+            float oldD  = 1f + DamageBonusPerLevel * fromLevel;
+            float newD  = 1f + DamageBonusPerLevel * toLevel;
+            ship.Damage *= newD / oldD;
+
+            // Speed — divide out the old multiplier, apply the new one
+            ship.ApplySpeedMultiplier(GetSpeedMultiplier(toLevel) / GetSpeedMultiplier(fromLevel));
+
+            ship.UpgradeLevel = toLevel;
         }
 
         // ── Display helpers ──────────────────────────────────────────────────────

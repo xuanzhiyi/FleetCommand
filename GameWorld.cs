@@ -132,7 +132,21 @@ namespace FleetCommand
             // ── Research ──────────────────────────────────────────────────────
             var completed = Research.Tick(deltaMs);
             if (completed != null)
-                LogEvent($"✦ Research complete! {completed.Type} upgraded to Mk.{completed.Level}");
+            {
+                // Retrofit every existing ship of the same type that belongs to
+                // the player (TeamId == 0). Each ship tracks its own UpgradeLevel
+                // so ships built before an earlier upgrade tier are handled correctly.
+                foreach (var ship in Ships.Where(
+                    s => s.IsAlive && s.TeamId == 0 && s.Type == completed.Type))
+                {
+                    Research.ApplyUpgradeDelta(ship, ship.UpgradeLevel, completed.Level);
+                }
+
+                int retrofitCount = Ships.Count(
+                    s => s.IsAlive && s.TeamId == 0 && s.Type == completed.Type);
+                LogEvent($"✦ Research complete! {completed.Type} → Mk.{completed.Level}" +
+                         (retrofitCount > 0 ? $"  ({retrofitCount} ship{(retrofitCount > 1 ? "s" : "")} upgraded)" : ""));
+            }
 
             // ── Enemy AI controllers ──────────────────────────────────────────
             foreach (var e in Enemies)
@@ -316,7 +330,7 @@ namespace FleetCommand
                     }
                 }
             }
-            var capitalTypes = new[] { ShipType.Mothership, ShipType.Destroyer, ShipType.Battlecruiser };
+            var capitalTypes = new[] { ShipType.Mothership, ShipType.Destroyer, ShipType.Battlecruiser, ShipType.Frigate, ShipType.ResourceCollector };
             foreach (var cap in Ships.Where(s => s.IsAlive && capitalTypes.Contains(s.Type)))
             {
                 if (cap.HP >= cap.MaxHPValue) continue;

@@ -92,9 +92,12 @@ namespace FleetCommand
             {
                 WaveStream mp3Reader;
 
+                string[] music = new string[] { "FleetCommand.Resources.bgmusic.mp3", "FleetCommand.Resources.bgmusic2.mp3" };
+                Random rand = new Random();
+
 
                 var stream = Assembly.GetExecutingAssembly()
-                    .GetManifestResourceStream("FleetCommand.Resources.bgmusic.mp3");
+                    .GetManifestResourceStream(music[rand.Next(0,2)]);
                 //if (stream != null) { musicPlayer = new SoundPlayer(stream); musicPlayer.PlayLooping(); }
                 if (stream != null)
                 {
@@ -632,16 +635,17 @@ namespace FleetCommand
                     g.DrawLine(pen, ax, ay, bx, by);
             }
 
-            // Targeting rings
+            // Targeting rings — colour matches the targeted ship's computer team
             foreach (var ship in world.Ships.Where(s => !s.IsPlayerOwned && s.IsAlive && s.IsTargeted))
             {
-                float sx = (ship.Position.X + cameraOffset.X) * zoom;
-                float sy = (ship.Position.Y + cameraOffset.Y) * zoom;
-                float r = (GetShipHitRadius(ship.Type) + 6) * zoom;
-                float tk = 6 * zoom;
-                using (var pen = new Pen(Color.Red, 2) { DashStyle = DashStyle.Dash })
+                float sx   = (ship.Position.X + cameraOffset.X) * zoom;
+                float sy   = (ship.Position.Y + cameraOffset.Y) * zoom;
+                float r    = (GetShipHitRadius(ship.Type) + 6) * zoom;
+                float tk   = 6 * zoom;
+                Color tcol = Ship.GetTeamColor(ship.TeamId);
+                using (var pen = new Pen(tcol, 2) { DashStyle = DashStyle.Dash })
                     g.DrawEllipse(pen, sx - r, sy - r, r * 2, r * 2);
-                using (var pen = new Pen(Color.Red, 1.5f))
+                using (var pen = new Pen(tcol, 1.5f))
                 {
                     g.DrawLine(pen, sx - r - tk, sy, sx - r, sy);
                     g.DrawLine(pen, sx + r, sy, sx + r + tk, sy);

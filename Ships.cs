@@ -117,11 +117,26 @@ namespace FleetCommand
 
         public abstract void Draw(Graphics g, PointF offset, float zoom);
 
+        /// <summary>Returns the canonical colour for a given team slot.</summary>
+        /// <param name="teamId">0 = player, 1/2/3 = Computer 1/2/3.</param>
+        public static Color GetTeamColor(int teamId)
+        {
+            switch (teamId)
+            {
+                case 0:  return Color.LimeGreen;                      // Player
+                case 1:  return Color.OrangeRed;                      // Computer 1
+                case 2:  return Color.FromArgb(175, 105, 255);        // Computer 2 — purple
+                case 3:  return Color.FromArgb(255, 200,  40);        // Computer 3 — amber
+                default: return Color.Gray;
+            }
+        }
+
         protected Color GetShipColor()
         {
             if (!IsAlive)       return Color.Gray;
             if (IsPlayerOwned)  return IsSelected ? Color.Cyan : Color.LimeGreen;
-            return IsTargeted ? Color.Yellow : Color.OrangeRed;
+            // Each computer player gets its own distinct colour; yellow flash when targeted
+            return IsTargeted ? Color.Yellow : GetTeamColor(TeamId);
         }
 
         public bool IsTargeted { get; set; }
@@ -137,13 +152,20 @@ namespace FleetCommand
 
         protected void DrawLabel(Graphics g, PointF screenPos, float size)
         {
-            string text = UpgradeLevel > 0 ? $"{Label} [Mk.{UpgradeLevel}]" : Label;
-            using (var font = new Font("Arial", Math.Max(6, 7 / size), FontStyle.Regular))
+            // Prefix enemy ships with their AI slot so the player can tell Ai1/Ai2/Ai3 apart.
+            string owner  = IsPlayerOwned ? "" : $"Ai{TeamId} · ";
+            string body   = UpgradeLevel > 0 ? $"{Label} [Mk.{UpgradeLevel}]" : Label;
+            string text   = owner + body;
+
+            // Label colour: player stays LightGreen/Cyan; each computer gets its team colour.
+            Color labelColor = IsPlayerOwned
+                ? (UpgradeLevel > 0 ? Color.Cyan : Color.LightGreen)
+                : GetTeamColor(TeamId);
+
+            using (var font  = new Font("Arial", Math.Max(6, 7 / size), FontStyle.Regular))
+            using (var brush = new SolidBrush(labelColor))
             {
-                SizeF  ts    = g.MeasureString(text, font);
-                Brush  brush = UpgradeLevel > 0
-                    ? (IsPlayerOwned ? Brushes.Cyan : Brushes.Yellow)
-                    : (IsPlayerOwned ? (Brush)Brushes.LightGreen : Brushes.OrangeRed);
+                SizeF ts = g.MeasureString(text, font);
                 g.DrawString(text, font, brush,
                     screenPos.X - ts.Width / 2, screenPos.Y - size - ts.Height - 2);
             }
@@ -234,6 +256,9 @@ namespace FleetCommand
                 return;
             }
 
+            // Each miner returns to its own team's mothership, not always the player's.
+            Ship myMothership = IsPlayerOwned ? playerMothership : FindOwnMothership(allShips);
+
             if (IsMining && TargetAsteroid != null)
             {
                 if (!TargetAsteroid.IsAlive) { TargetAsteroid = null; IsMining = false; miningTimer = 0; return; }
@@ -262,16 +287,16 @@ namespace FleetCommand
                             IsOffloading          = false;
                             IsMining              = false;
                             offloadTimer          = 0;
-                            if (playerMothership != null)
-                                Destination = playerMothership.Position;
+                            if (myMothership != null)
+                                Destination = myMothership.Position;
                         }
                     }
                 }
             }
-            else if (ReturningToMothership && playerMothership != null)
+            else if (ReturningToMothership && myMothership != null)
             {
                 // Go to nearest collector (if one exists nearby) or mothership
-                Ship offloadAt = FindOffloadTarget(allShips, playerMothership);
+                Ship offloadAt = FindOffloadTarget(allShips, myMothership);
                 Destination = offloadAt.Position;
                 MoveTowardDestination();
 
@@ -348,14 +373,22 @@ namespace FleetCommand
             DrawLabel(g, new PointF(sx, sy), r);
         }
 
-        private Ship FindOffloadTarget(List<Ship> allShips, Ship playerMothership)
+        private Ship FindOwnMothership(List<Ship> allShips)
         {
-            Ship  best     = playerMothership;
-            float bestDist = Distance(Position, playerMothership.Position);
+            foreach (var ship in allShips)
+                if (ship is Mothership && ship.TeamId == TeamId && ship.IsAlive)
+                    return ship;
+            return null;
+        }
+
+        private Ship FindOffloadTarget(List<Ship> allShips, Ship myMothership)
+        {
+            Ship  best     = myMothership;
+            float bestDist = Distance(Position, myMothership.Position);
             foreach (var ship in allShips)
             {
                 if (!(ship is ResourceCollector rc)) continue;
-                if (!rc.IsAlive || !rc.IsPlayerOwned) continue;
+                if (!rc.IsAlive || rc.TeamId != TeamId) continue;
                 float d = Distance(Position, rc.Position);
                 if (d < bestDist) { bestDist = d; best = rc; }
             }
