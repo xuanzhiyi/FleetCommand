@@ -23,7 +23,7 @@ namespace FleetCommand
         private static readonly int[,] ResearchCosts =
         {
             //  Mk.I   Mk.II   Mk.III
-            {   0,     0,      0    },   // Mothership (no research)
+            {   0,     0,      0    },   // Mothership        (no research)
             { 200,   500,    800   },   // Miner
             { 300,   700,   1000   },   // Interceptor
             { 300,   700,   1000   },   // Bomber
@@ -31,19 +31,23 @@ namespace FleetCommand
             { 600,  1200,   1500   },   // Frigate
             { 900,  2000,   2500   },   // Destroyer
             {1500,  2500,   5000   },   // Battlecruiser
+            {   0,     0,      0   },   // ResourceCollector  (no research)
+            {1000,  2000,   3500   },   // Carrier
         };
 
         // Research duration in ms: [shipTypeIndex][level-1]
         private static readonly int[,] ResearchTimes =
         {
-            {     0,      0,      0 },  // Mothership
-            { 10000,  20000,  30000 },  // Miner
-            { 12000,  25000,  35000 },  // Interceptor
-            { 12000,  25000,  35000 },  // Bomber
-            { 15000,  30000,  45000 },  // Corvet
-            { 20000,  40000,  60000 },  // Frigate
-            { 30000,  60000,  90000 },  // Destroyer
-            { 40000,  70000,  10000 },  // Battlecruiser
+            {     0,      0,       0 },  // Mothership
+            { 10000,  20000,   30000 },  // Miner
+            { 12000,  25000,   35000 },  // Interceptor
+            { 12000,  25000,   35000 },  // Bomber
+            { 15000,  30000,   45000 },  // Corvet
+            { 20000,  40000,   60000 },  // Frigate
+            { 30000,  60000,   90000 },  // Destroyer
+            { 40000,  70000,  100000 },  // Battlecruiser
+            {     0,      0,       0 },  // ResourceCollector (no research)
+            { 25000,  50000,   80000 },  // Carrier
         };
 
         public ResearchManager()
@@ -56,7 +60,7 @@ namespace FleetCommand
 
         public bool CanResearch(ShipType type)
         {
-            if (type == ShipType.Mothership) return false;
+            if (type == ShipType.Mothership || type == ShipType.ResourceCollector) return false;
             return Levels[type] < 3;
         }
 
@@ -72,7 +76,8 @@ namespace FleetCommand
         public bool TryStart(ShipType type, ref int playerResources, out string error)
         {
             error = null;
-            if (type == ShipType.Mothership) { error = "Mothership cannot be upgraded."; return false; }
+            if (type == ShipType.Mothership || type == ShipType.ResourceCollector)
+                { error = $"{type} cannot be upgraded."; return false; }
             if (!CanResearch(type))          { error = $"{type} already at max upgrade (Mk.III)."; return false; }
             if (ActiveOrder != null)         { error = "Research lab is busy — wait for current research."; return false; }
 

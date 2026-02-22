@@ -55,8 +55,11 @@ namespace FleetCommand
         private Panel buildTabPanel;
         private Panel researchTabPanel;
 
-        // Build tab
-        private readonly List<Button> buildButtons = new List<Button>();
+        // Build tab — two button sets (only one visible at a time)
+        private readonly List<Button> _msBuildButtons      = new List<Button>();
+        private readonly List<Button> _carrierBuildButtons = new List<Button>();
+        private Ship  _activeBuildSource = null;  // null = mothership
+        private Label _buildSourceLabel;
 
         // Research tab
         private readonly List<ResearchRowInline> researchRows = new List<ResearchRowInline>();
@@ -267,7 +270,7 @@ namespace FleetCommand
                     "LClick: select   Ctrl+A: select all\n" +
                     "RClick enemy: ATTACK   RClick: MOVE\n" +
                     "RClick asteroid: MINE\n" +
-                    "DblClick mothership → Build tab\n" +
+                    "DblClick Mothership/Carrier → Build tab\n" +
                     "SPACE: pause   ESC: deselect/menu",
                 ForeColor = Color.DarkGray,
                 Font = new Font("Consolas", 7),
@@ -316,7 +319,8 @@ namespace FleetCommand
 
         // ── Build tab content ──────────────────────────────────────────────────
 
-        private static readonly (ShipType Type, bool Squad)[] Buildable =
+        // Mothership can build everything (including the Carrier itself)
+        private static readonly (ShipType Type, bool Squad)[] MsBuildable =
         {
             (ShipType.Miner,              false),
             (ShipType.Interceptor,        true),
@@ -326,31 +330,62 @@ namespace FleetCommand
             (ShipType.Destroyer,          false),
             (ShipType.Battlecruiser,      false),
             (ShipType.ResourceCollector,  false),
+            (ShipType.Carrier,            false),
         };
+
+        // Carriers can only build fighters and workers
+        private static readonly (ShipType Type, bool Squad)[] CarrierBuildable =
+        {
+            (ShipType.Interceptor, true),
+            (ShipType.Bomber,      true),
+            (ShipType.Corvet,      false),
+            (ShipType.Miner,       false),
+        };
+
+        private Button MakeBuildButton(ShipType type, bool squad, int y, int w)
+        {
+            int    cost = GameConstants.BuildCosts[(int)type];
+            string lbl  = $"  {type}{(squad ? " ×5" : "")}  —  {cost} res";
+            var btn = new Button
+            {
+                Text      = lbl,
+                Location  = new Point(0, y),
+                Size      = new Size(w, 28),
+                BackColor = Color.FromArgb(30, 30, 60),
+                ForeColor = Color.LightGreen,
+                FlatStyle = FlatStyle.Flat,
+                Font      = new Font("Consolas", 8, FontStyle.Bold),
+                Tag       = type,
+                TextAlign = ContentAlignment.MiddleLeft,
+                TabStop   = false,
+            };
+            btn.FlatAppearance.BorderColor = Color.FromArgb(60, Color.Cyan);
+            btn.MouseEnter += (s, e) => { if (((Button)s).Enabled) ((Button)s).BackColor = Color.FromArgb(50, 50, 100); };
+            btn.MouseLeave += (s, e) => { if (((Button)s).Enabled) ((Button)s).BackColor = Color.FromArgb(30, 30, 60); };
+            return btn;
+        }
 
         private void BuildBuildTab(Panel p)
         {
             int y = 2;
-            foreach (var (type, squad) in Buildable)
+
+            // ── Source indicator ─────────────────────────────────────────────
+            _buildSourceLabel = new Label
             {
-                int cost = GameConstants.BuildCosts[(int)type];
-                string lbl = $"  {type}{(squad ? " ×5" : "")}  —  {cost} res";
-                var btn = new Button
-                {
-                    Text = lbl,
-                    Location = new Point(0, y),
-                    Size = new Size(p.Width, 34),
-                    BackColor = Color.FromArgb(30, 30, 60),
-                    ForeColor = Color.LightGreen,
-                    FlatStyle = FlatStyle.Flat,
-                    Font = new Font("Consolas", 8, FontStyle.Bold),
-                    Tag = type,
-                    TextAlign = ContentAlignment.MiddleLeft,
-                    TabStop = false,
-                };
-                btn.FlatAppearance.BorderColor = Color.FromArgb(60, Color.Cyan);
-                btn.MouseEnter += (s, e) => { if (((Button)s).Enabled) ((Button)s).BackColor = Color.FromArgb(50, 50, 100); };
-                btn.MouseLeave += (s, e) => { if (((Button)s).Enabled) ((Button)s).BackColor = Color.FromArgb(30, 30, 60); };
+                Text      = "◈ Mothership",
+                ForeColor = Color.Gold,
+                Font      = new Font("Consolas", 8, FontStyle.Bold),
+                AutoSize  = true,
+                Location  = new Point(0, y),
+            };
+            p.Controls.Add(_buildSourceLabel);
+            y += 20;
+
+            // ── Mothership build buttons (visible by default) ─────────────
+            int msy = y;
+            foreach (var (type, squad) in MsBuildable)
+            {
+                var btn = MakeBuildButton(type, squad, msy, p.Width);
                 btn.Click += (s, e) =>
                 {
                     if (!world.TryBuildShip((ShipType)((Button)s).Tag))
@@ -359,8 +394,33 @@ namespace FleetCommand
                     this.Focus();
                 };
                 p.Controls.Add(btn);
-                buildButtons.Add(btn);
-                y += 36;
+                _msBuildButtons.Add(btn);
+                msy += 30;
+            }
+
+            // ── Carrier build buttons (hidden until carrier is selected) ──
+            int cvy = y;
+            foreach (var (type, squad) in CarrierBuildable)
+            {
+                var btn = MakeBuildButton(type, squad, cvy, p.Width);
+                btn.Visible = false;
+                btn.Click += (s, e) =>
+                {
+                    var carrier = _activeBuildSource as Carrier;
+                    if (carrier == null || !carrier.IsAlive)
+                    {
+                        MessageBox.Show("No active carrier — double-click a carrier to select it.",
+                            "No Carrier Selected", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    if (!world.TryBuildFromCarrier(carrier, (ShipType)((Button)s).Tag))
+                        MessageBox.Show("Not enough resources, queue is full, or fleet cap reached!",
+                            "Cannot Build", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    this.Focus();
+                };
+                p.Controls.Add(btn);
+                _carrierBuildButtons.Add(btn);
+                cvy += 30;
             }
         }
 
@@ -369,7 +429,7 @@ namespace FleetCommand
         private static readonly ShipType[] Researchable =
         {
             ShipType.Miner, ShipType.Interceptor, ShipType.Bomber, ShipType.Corvet,
-            ShipType.Frigate, ShipType.Destroyer, ShipType.Battlecruiser,
+            ShipType.Frigate, ShipType.Destroyer, ShipType.Battlecruiser, ShipType.Carrier,
         };
 
         private void BuildResearchTab(Panel p, int W)
@@ -454,6 +514,25 @@ namespace FleetCommand
             if (!showBuild) RefreshResearchRows();
         }
 
+        // ── Build source (mothership vs. a specific carrier) ───────────────────
+
+        private void SetBuildSource(Ship source)
+        {
+            _activeBuildSource = source;
+            bool isCarrier = source is Carrier;
+
+            if (_buildSourceLabel != null)
+            {
+                _buildSourceLabel.Text      = isCarrier ? "◈ Carrier build" : "◈ Mothership";
+                _buildSourceLabel.ForeColor = isCarrier ? Color.Cyan : Color.Gold;
+            }
+
+            foreach (var btn in _msBuildButtons)      btn.Visible = !isCarrier;
+            foreach (var btn in _carrierBuildButtons) btn.Visible =  isCarrier;
+
+            SwitchTab(true);   // always reveal the Build tab
+        }
+
         private Button MakeTabBtn(string text, int x, int y, int w) => new Button
         {
             Text = text,
@@ -509,12 +588,29 @@ namespace FleetCommand
                 if (c is Label lbl && lbl.Tag is ShipType st)
                     lbl.Text = $"{st}: {world.Ships.Count(s => s.IsPlayerOwned && s.IsAlive && s.Type == st)}";
 
-            // Build queue
-            var queue = world.PlayerMothership?.BuildQueue;
+            // Reset build source if the selected carrier has died
+            if (_activeBuildSource is Carrier cvDead && !cvDead.IsAlive)
+            {
+                _activeBuildSource = null;
+                if (_buildSourceLabel != null)
+                {
+                    _buildSourceLabel.Text      = "◈ Mothership";
+                    _buildSourceLabel.ForeColor = Color.Gold;
+                }
+                foreach (var btn in _msBuildButtons)      btn.Visible = true;
+                foreach (var btn in _carrierBuildButtons) btn.Visible = false;
+            }
+
+            // Build queue — show the active source (mothership or carrier)
+            var activeCarrier = _activeBuildSource as Carrier;
+            var queue = (activeCarrier != null && activeCarrier.IsAlive)
+                ? activeCarrier.BuildQueue
+                : world.PlayerMothership?.BuildQueue;
+            string qSrc = (activeCarrier != null && activeCarrier.IsAlive) ? "Carrier" : "MS";
             if (queue != null && queue.Count > 0)
             {
                 var building = queue[0];
-                buildProgressLabel.Text = $"Building: {building.Type}";
+                buildProgressLabel.Text = $"Building ({qSrc}): {building.Type}";
                 buildProgress.Value = (int)(building.Progress * 100);
                 var rem = queue.Skip(1).Select(q => q.Type.ToString()).ToArray();
                 buildQueueLabel.Text = rem.Length > 0
@@ -573,11 +669,12 @@ namespace FleetCommand
 
         private void UpdateBuildAffordability()
         {
-            foreach (var btn in buildButtons)
+            var active = (_activeBuildSource is Carrier) ? _carrierBuildButtons : _msBuildButtons;
+            foreach (var btn in active)
             {
-                int cost = GameConstants.BuildCosts[(int)(ShipType)btn.Tag];
-                bool ok = world.PlayerResources >= cost;
-                btn.Enabled = ok;
+                int  cost = GameConstants.BuildCosts[(int)(ShipType)btn.Tag];
+                bool ok   = world.PlayerResources >= cost;
+                btn.Enabled   = ok;
                 btn.ForeColor = ok ? Color.LightGreen : Color.DarkGray;
                 btn.BackColor = ok ? Color.FromArgb(30, 30, 60) : Color.FromArgb(20, 20, 30);
             }
@@ -835,8 +932,17 @@ namespace FleetCommand
         {
             if (e.Button != MouseButtons.Left) return;
             var wp = ScreenToWorld(e.Location);
-            if (world.PlayerMothership?.IsAlive == true && world.PlayerMothership.HitTest(wp, 45))
-                SwitchTab(true); // open Build tab
+
+            // Double-click a player carrier → switch build source to that carrier
+            var carrier = world.Ships.OfType<Carrier>()
+                .FirstOrDefault(c => c.IsPlayerOwned && c.IsAlive
+                    && c.HitTest(wp, GetShipHitRadius(c.Type)));
+            if (carrier != null) { SetBuildSource(carrier); return; }
+
+            // Double-click the mothership → switch build source back to mothership
+            if (world.PlayerMothership?.IsAlive == true
+                    && world.PlayerMothership.HitTest(wp, 45))
+                SetBuildSource(world.PlayerMothership);
         }
 
         private void OnMouseDown(object sender, MouseEventArgs e)
@@ -946,6 +1052,7 @@ namespace FleetCommand
                             case ShipType.Frigate:
                             case ShipType.Destroyer:
                             case ShipType.Battlecruiser:
+                            case ShipType.Carrier:
                                 capitals.Add(s); break;
                             default:   // Miner, ResourceCollector, Mothership
                                 workers.Add(s); break;
@@ -1120,7 +1227,8 @@ namespace FleetCommand
                 case ShipType.Destroyer: return 22;
                 case ShipType.Battlecruiser: return 30;
                 case ShipType.ResourceCollector: return 20;
-                default: return 15;
+                case ShipType.Carrier:           return 50;
+                default:                         return 15;
             }
         }
 

@@ -10,7 +10,8 @@ namespace FleetCommand
         Frigate,
         Destroyer,
         Battlecruiser,
-        ResourceCollector
+        ResourceCollector,
+        Carrier
     }
 
     // AI strategy level — affects decision-making, NOT stat multipliers
@@ -21,19 +22,19 @@ namespace FleetCommand
     public static class GameConstants
     {
         public static readonly int[] BuildCosts = {
-            0, 50, 150, 200, 300, 500, 800, 1500, 400
+            0, 50, 150, 200, 300, 500, 800, 1500, 400, 2000
         };
         public static readonly int[] BuildTimes = {
-            0, 5000, 6000, 10000, 12000, 15000, 30000, 45000, 12000
+            0, 5000, 6000, 10000, 12000, 15000, 30000, 45000, 12000, 45000
         };
         public static readonly int[] MaxHP = {
-            12000, 100, 200, 220, 180, 500, 3000, 10000, 600
+            12000, 100, 200, 220, 180, 500, 3000, 10000, 600, 5000
         };
         public static readonly float[] Damage = {
-            1.0f, 0, 0.3f, 0.5f, 0.3f, 0.7f, 1.2f, 2.5f, 0
+            1.0f, 0, 0.3f, 0.5f, 0.3f, 0.7f, 1.2f, 2.5f, 0, 0.4f
         };
         public static readonly float[] Speeds = {
-            0.5f, 1.5f, 3.5f, 2.5f, 3.0f, 1.8f, 1.3f, 1.0f, 1.2f
+            0.5f, 1.5f, 3.5f, 2.5f, 3.0f, 1.8f, 1.3f, 1.0f, 1.2f, 1.0f
         };
 
         public const int MiningRate         = 10;
@@ -50,9 +51,9 @@ namespace FleetCommand
 
         // ── Fleet caps per ship type (max ships per team) ─────────────────────
         // Indexed by ShipType: Mothership, Miner, Interceptor, Bomber, Corvet,
-        //                      Frigate, Destroyer, Battlecruiser, ResourceCollector
+        //                      Frigate, Destroyer, Battlecruiser, ResourceCollector, Carrier
         public static readonly int[] FleetCaps = {
-            1, 20, 50, 40, 30, 20, 8, 5, 4
+            1, 20, 50, 40, 30, 20, 8, 5, 4, 3
         };
 
         // ── Combat multipliers (strong / weak against) ────────────────────────

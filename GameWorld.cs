@@ -119,15 +119,23 @@ namespace FleetCommand
                 if (nearest != null) { miner.TargetAsteroid = nearest; miner.IsMining = true; }
             }
 
-            // ── Player collector receiving flag ───────────────────────────────
+            // ── Player collector / carrier receiving flag ─────────────────────
             foreach (var rc in Ships.OfType<ResourceCollector>()
                 .Where(r => r.IsAlive && r.TeamId == 0))
                 rc.IsReceiving = false;
+            foreach (var cv in Ships.OfType<Carrier>()
+                .Where(c => c.IsAlive && c.TeamId == 0))
+                cv.IsReceiving = false;
 
             // ── Build queues ──────────────────────────────────────────────────
             ProcessBuildQueue(PlayerMothership, true, deltaMs);
             foreach (var e in Enemies)
                 if (e.IsAlive) ProcessBuildQueue(e.Mothership, false, deltaMs, e);
+
+            // ── Carrier build queues (player only) ────────────────────────────
+            foreach (var cv in Ships.OfType<Carrier>()
+                .Where(c => c.IsAlive && c.TeamId == 0).ToList())
+                ProcessCarrierBuildQueue(cv, deltaMs);
 
             // ── Research ──────────────────────────────────────────────────────
             var completed = Research.Tick(deltaMs);
@@ -340,7 +348,7 @@ namespace FleetCommand
             if (CombatEffects.Count > 120) return;
             CombatEffectKind kind;
             if (attackerType == ShipType.Bomber)
-                kind = CombatEffectKind.TorpedoOrange;
+                kind = CombatEffectKind.Bomb;
             else if (!isPlayer)
                 kind = CombatEffectKind.LaserRed;
             else if (attackerType == ShipType.Interceptor || attackerType == ShipType.Corvet)
@@ -357,7 +365,8 @@ namespace FleetCommand
         {
             float dt = deltaMs / 1000f;
             var dockStations = Ships.Where(s => s.IsAlive &&
-                (s.Type == ShipType.Mothership || s.Type == ShipType.Battlecruiser)).ToList();
+                (s.Type == ShipType.Mothership || s.Type == ShipType.Battlecruiser ||
+                 s.Type == ShipType.Carrier)).ToList();
             var lightShips = Ships.Where(s => s.IsAlive &&
                 (s.Type == ShipType.Interceptor || s.Type == ShipType.Bomber ||
                  s.Type == ShipType.Miner       || s.Type == ShipType.Corvet)).ToList();
@@ -387,7 +396,8 @@ namespace FleetCommand
                     }
                 }
             }
-            var capitalTypes = new[] { ShipType.Mothership, ShipType.Destroyer, ShipType.Battlecruiser, ShipType.Frigate, ShipType.ResourceCollector };
+            var capitalTypes = new[] { ShipType.Mothership, ShipType.Destroyer, ShipType.Battlecruiser,
+                                       ShipType.Frigate, ShipType.ResourceCollector, ShipType.Carrier };
             foreach (var cap in Ships.Where(s => s.IsAlive && capitalTypes.Contains(s.Type)))
             {
                 if (cap.HP >= cap.MaxHPValue) continue;
@@ -424,6 +434,98 @@ namespace FleetCommand
             PlayerResources -= cost;
             PlayerMothership.BuildQueue.Add(new BuildOrder(type, 1.0f));
             LogEvent($"Building {type}... Cost: {cost} resources");
+            return true;
+        }
+
+        // ── Carrier-specific build queue ──────────────────────────────────────
+
+        private void ProcessCarrierBuildQueue(Carrier carrier, int deltaMs)
+        {
+            if (carrier.BuildQueue.Count == 0) return;
+            var order = carrier.BuildQueue[0];
+            order.Elapsed += deltaMs;
+            if (!order.IsComplete) return;
+
+            carrier.BuildQueue.RemoveAt(0);
+            int count = order.Type == ShipType.Interceptor || order.Type == ShipType.Bomber ? 5
+                      : order.Type == ShipType.Corvet ? 3
+                      : 1;
+
+            // Delta spawn formation above the carrier
+            PointF[] spawnPositions = new PointF[count];
+            if (count > 1)
+            {
+                PointF fwd    = new PointF(0f, -1f);
+                PointF right  = new PointF(fwd.Y, -fwd.X);
+                PointF center = new PointF(carrier.Position.X, carrier.Position.Y - 80f);
+
+                const float rowSpacing = 15f;
+                const float colSpacing = 15f;
+
+                int idx = 0;
+                for (int row = 0; idx < count; row++)
+                {
+                    int   shipsInRow = Math.Min(row + 1, count - idx);
+                    float rear       = row * rowSpacing;
+                    for (int i = 0; i < shipsInRow; i++, idx++)
+                    {
+                        float lat = shipsInRow == 1
+                            ? 0f
+                            : (-row / 2.0f + (float)i * row / (shipsInRow - 1)) * colSpacing;
+                        spawnPositions[idx] = new PointF(
+                            center.X + lat * right.X - rear * fwd.X,
+                            center.Y + lat * right.Y - rear * fwd.Y);
+                    }
+                }
+            }
+            else
+            {
+                spawnPositions[0] = ShipFactory.RandomOffset(carrier.Position, 60);
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                var newShip = ShipFactory.Create(order.Type, spawnPositions[i], true);
+                newShip.TeamId = carrier.TeamId;
+                Research.ApplyTo(newShip);
+                newShip.UpgradeLevel = Research.Levels[order.Type];
+                Ships.Add(newShip);
+
+                if (order.Type == ShipType.Miner)
+                {
+                    var miner   = (Miner)newShip;
+                    var nearest = Asteroids.Where(a => a.IsAlive)
+                                           .OrderBy(a => Dist(miner.Position, a.Position))
+                                           .FirstOrDefault();
+                    if (nearest != null) { miner.TargetAsteroid = nearest; miner.IsMining = true; }
+                }
+            }
+            LogEvent($"Carrier built {order.Type}!{(count > 1 ? $" ×{count}" : "")}");
+        }
+
+        public bool TryBuildFromCarrier(Carrier carrier, ShipType type)
+        {
+            if (carrier == null || !carrier.IsAlive) return false;
+            if (!System.Array.Exists(Carrier.CanBuild, t => t == type)) return false;
+
+            int cost = GameConstants.BuildCosts[(int)type];
+            if (PlayerResources < cost) return false;
+            if (carrier.BuildQueue.Count >= 5) return false;
+
+            int cap        = GameConstants.FleetCaps[(int)type];
+            int spawnCount = type == ShipType.Interceptor || type == ShipType.Bomber ? 5
+                           : type == ShipType.Corvet ? 3
+                           : 1;
+            int live   = Ships.Count(s => s.IsAlive && s.TeamId == 0 && s.Type == type);
+            // Count queued from mothership + all carriers
+            int queued = PlayerMothership.BuildQueue.Count(q => q.Type == type) * spawnCount;
+            foreach (var cv in Ships.OfType<Carrier>().Where(c => c.IsAlive && c.TeamId == 0))
+                queued += cv.BuildQueue.Count(q => q.Type == type) * spawnCount;
+            if (live + queued + spawnCount > cap) return false;
+
+            PlayerResources -= cost;
+            carrier.BuildQueue.Add(new BuildOrder(type, 1.0f));
+            LogEvent($"Carrier building {type}...  Cost: {cost} resources");
             return true;
         }
 

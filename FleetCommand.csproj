@@ -62,6 +62,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Battlecruiser.cs" />
+    <Compile Include="Carrier.cs" />
     <Compile Include="Corvet.cs" />
     <Compile Include="Destroyer.cs" />
     <Compile Include="Frigate.cs" />

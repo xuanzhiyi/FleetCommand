@@ -122,6 +122,7 @@ namespace FleetCommand
                 case ShipType.Destroyer:     return 90;
                 case ShipType.Battlecruiser: return 120;
                 case ShipType.Mothership:    return 80;
+                case ShipType.Carrier:       return 65;
                 default:                     return 0;
             }
         }

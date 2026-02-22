@@ -80,9 +80,9 @@ namespace FleetCommand
                 Destination = offloadAt.Position;
                 MoveTowardDestination();
 
-                float offloadRange = offloadAt is ResourceCollector
-                    ? ResourceCollector.OffloadRange
-                    : 50;
+                float offloadRange = offloadAt is ResourceCollector ? ResourceCollector.OffloadRange
+                                   : offloadAt is Carrier          ? Carrier.OffloadRange
+                                   : 50;
 
                 if (Distance(Position, offloadAt.Position) < offloadRange)
                 {
@@ -95,7 +95,8 @@ namespace FleetCommand
                         ReturningToMothership = false;
                         PendingDeposit        = CargoHeld;  // GameWorld credits instantly
                         CargoHeld             = 0;
-                        if (offloadAt is ResourceCollector rc) rc.IsReceiving = true;
+                        if      (offloadAt is ResourceCollector rc) rc.IsReceiving = true;
+                        else if (offloadAt is Carrier           cv) cv.IsReceiving = true;
                     }
                 }
                 else
@@ -167,10 +168,12 @@ namespace FleetCommand
             float bestDist = Distance(Position, myMothership.Position);
             foreach (var ship in allShips)
             {
-                if (!(ship is ResourceCollector rc)) continue;
-                if (!rc.IsAlive || rc.TeamId != TeamId) continue;
-                float d = Distance(Position, rc.Position);
-                if (d < bestDist) { bestDist = d; best = rc; }
+                if (!ship.IsAlive || ship.TeamId != TeamId) continue;
+                if (ship is ResourceCollector || ship is Carrier)
+                {
+                    float d = Distance(Position, ship.Position);
+                    if (d < bestDist) { bestDist = d; best = ship; }
+                }
             }
             return best;
         }

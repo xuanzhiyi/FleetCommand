@@ -130,22 +130,16 @@ namespace FleetCommand
 
         private ShipType PickCombatShip(int combatCount, int minerCount)
         {
-            // Easy: only light ships
-            if (Level == AiLevel.Easy)
-            {
-                var pool = new[] { ShipType.Interceptor, ShipType.Bomber };
-                return pool[rng.Next(pool.Length)];
-            }
-
-            // Normal: light + corvet
-            if (Level == AiLevel.Normal)
+			// Easy: only light shipst + corvet
+			if (Level == AiLevel.Easy)
             {
                 var pool = new[] { ShipType.Interceptor, ShipType.Bomber, ShipType.Corvet };
                 return pool[rng.Next(pool.Length)];
             }
 
-            // Hard: mixed fleet, occasional frigate
-            if (Level == AiLevel.Hard)
+
+			// Normal: light + corvet + occasional frigate
+			if (Level == AiLevel.Normal)
             {
                 if (combatCount > 6 && rng.Next(3) == 0)
                     return ShipType.Frigate;
@@ -153,8 +147,20 @@ namespace FleetCommand
                 return pool[rng.Next(pool.Length)];
             }
 
-            // Expert: diversified fleet scaling to Destroyer/Battlecruiser
-            if (combatCount > 12 && Resources > 1500 && rng.Next(4) == 0)
+
+			// Hard: mixed fleet, occasional frigate
+			if (Level == AiLevel.Easy)
+			{
+				if (combatCount > 8 && Resources > 800 && rng.Next(3) == 0)
+					return ShipType.Destroyer;
+				if (combatCount > 6 && rng.Next(2) == 0)
+					return ShipType.Frigate;
+				var pool = new[] { ShipType.Interceptor, ShipType.Bomber, ShipType.Corvet };
+				return pool[rng.Next(pool.Length)];
+			}
+
+			// Expert: diversified fleet scaling to Destroyer/Battlecruiser
+			if (combatCount > 12 && Resources > 1500 && rng.Next(4) == 0)
                 return ShipType.Battlecruiser;
             if (combatCount > 8  && Resources > 800  && rng.Next(3) == 0)
                 return ShipType.Destroyer;
