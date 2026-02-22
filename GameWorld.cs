@@ -45,9 +45,14 @@ namespace FleetCommand
                 Ships.Add(m);
             }
 
-            // ── Enemy AIs ─────────────────────────────────────────────────────
-            // Place motherships evenly on the right half of the map
-            int   count  = enemyLevels.Count;
+			//debug
+			//var carrier = new Carrier(new PointF(450, GameConstants.MapHeight / 2f), true);
+			//carrier.TeamId = 0;
+			//Ships.Add(carrier);
+
+			// ── Enemy AIs ─────────────────────────────────────────────────────
+			// Place motherships evenly on the right half of the map
+			int   count  = enemyLevels.Count;
             float startY = GameConstants.MapHeight * 0.2f;
             float stepY  = GameConstants.MapHeight * 0.6f / Math.Max(1, count - 1);
             if (count == 1) startY = GameConstants.MapHeight / 2f;

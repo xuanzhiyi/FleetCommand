@@ -16,8 +16,15 @@ namespace FleetCommand
         // Build queue (separate from the mothership)
         public List<BuildOrder> BuildQueue { get; } = new List<BuildOrder>();
 
-        // Visual pulse when a miner is actively offloading nearby
-        public bool IsReceiving { get; set; }
+
+		// Zoom level at which the sprite is shown instead of the plain polygon.
+		private const float SpriteZoom = 1.2f;
+
+		private static Bitmap _sprite;
+		private static readonly object _spriteLock = new object();
+
+		// Visual pulse when a miner is actively offloading nearby
+		public bool IsReceiving { get; set; }
 
         // Ship types this carrier is allowed to build
         public static readonly ShipType[] CanBuild =
@@ -34,25 +41,69 @@ namespace FleetCommand
             Label = "Carrier";
         }
 
-        public override void Draw(Graphics g, PointF offset, float zoom)
+		private static Bitmap GetSprite()
+		{
+			if (_sprite != null) return _sprite;
+			lock (_spriteLock)
+			{
+				if (_sprite != null) return _sprite;
+				try { _sprite = new Bitmap(Properties.Resources.Carrier); }
+				catch { _sprite = null; }   // falls back to polygon if image missing
+			}
+			return _sprite;
+		}
+
+
+		public override void Draw(Graphics g, PointF offset, float zoom)
         {
             float sx  = (Position.X + offset.X) * zoom;
             float sy  = (Position.Y + offset.Y) * zoom;
             float w   = 30 * zoom;   // half-width of flight deck
-            float h   = 20 * zoom;   // half-height of hull
+            float h   = 30 * zoom;   // half-height of hull
             var   col = GetShipColor();
 
-            // ── Main hull (wide flat flight deck) ─────────────────────────────
-            var hullRect = new RectangleF(sx - w, sy - h * 0.45f, w * 2, h);
-            using (var pen   = new Pen(col, IsSelected ? 2f : 1.5f))
-            using (var brush = new SolidBrush(Color.FromArgb(40, col)))
+			// ── Main hull (wide flat flight deck) ─────────────────────────────
+			var hullRect = new RectangleF(sx - w, sy - h * 0.7f, w * 2, h);
+			if (zoom >= SpriteZoom)
             {
-                g.FillRectangle(brush, hullRect);
-                g.DrawRectangle(pen, hullRect.X, hullRect.Y, hullRect.Width, hullRect.Height);
+                // ── Sprite mode ───────────────────────────────────────────────
+                var sprite = GetSprite();
+                if (sprite != null)
+                {
+                    // Sized slightly wider than the full parallelogram span
+                    // (w + skew on each side), with a landscape aspect ratio.
+                    float sz = w * 2.1f;
+                    var dest = new Rectangle((int)(sx - sz * 0.5f),
+                                               (int)(sy - sz * 0.4f),
+                                               (int)sz, (int)(sz * 0.8f));
 
-                // Centre deck runway line
-                using (var runwayPen = new Pen(Color.FromArgb(80, col), 1f))
-                    g.DrawLine(runwayPen, sx - w + 4, sy, sx + w - 4, sy);
+                    using (var ia = new System.Drawing.Imaging.ImageAttributes())
+                    {
+                        // Key out near-black background (0,0,0) → (20,20,20)
+                        ia.SetColorKey(Color.FromArgb(0, 0, 0),
+                                       Color.FromArgb(20, 20, 20));
+                        g.DrawImage(sprite, dest,
+                                    0, 0, sprite.Width, sprite.Height*1.3f,
+                                    GraphicsUnit.Pixel, ia);
+                    }
+                }
+				int ringAlpha = IsSelected ? 220 : 90;
+				using (var pen = new Pen(Color.FromArgb(ringAlpha, GetShipColor()),
+										 IsSelected ? 2.5f : 1.5f))
+					g.DrawRectangle(pen, hullRect.X, hullRect.Y, hullRect.Width, hullRect.Height);
+			}
+            else
+            {
+                using (var pen = new Pen(col, IsSelected ? 2f : 1.5f))
+                using (var brush = new SolidBrush(Color.FromArgb(40, col)))
+                {
+                    g.FillRectangle(brush, hullRect);
+                    g.DrawRectangle(pen, hullRect.X, hullRect.Y, hullRect.Width, hullRect.Height);
+
+                    // Centre deck runway line
+                    using (var runwayPen = new Pen(Color.FromArgb(80, col), 1f))
+                        g.DrawLine(runwayPen, sx - w + 4, sy, sx + w - 4, sy);
+                }
             }
 
             // ── Dock repair glow (green ring) ─────────────────────────────────

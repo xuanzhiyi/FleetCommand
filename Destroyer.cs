@@ -29,7 +29,7 @@ namespace FleetCommand
         }
 
         // Zoom level at which the sprite is shown instead of the plain polygon.
-        private const float SpriteZoom = 1.0f;
+        private const float SpriteZoom = 1.2f;
 
         // ─────────────────────────────────────────────────────────────────────
         public override void Draw(Graphics g, PointF offset, float zoom)

@@ -25,7 +25,7 @@ namespace FleetCommand
             return _sprite;
         }
 
-        private const float SpriteZoom = 0.8f;
+        private const float SpriteZoom = 0.9f;
 
         // ─────────────────────────────────────────────────────────────────────
         public override void Draw(Graphics g, PointF offset, float zoom)
