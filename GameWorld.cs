@@ -191,10 +191,49 @@ namespace FleetCommand
 
             ms.BuildQueue.RemoveAt(0);
             int count = (order.Type == ShipType.Interceptor || order.Type == ShipType.Bomber) ? 5 : 1;
+
+            // Precompute spawn positions — fighter squadrons appear in a delta.
+            PointF[] spawnPositions = new PointF[count];
+            if (count > 1)
+            {
+                // Default orientation: tip pointing north (up on screen).
+                // fwd=(0,-1), right=(-1,0) → rearward = +Y, lateral flipped via right.
+                PointF fwd   = new PointF(0f, -1f);
+                PointF right = new PointF(fwd.Y, -fwd.X);   // (-1, 0)
+
+                // Centre the delta 160 units above the mothership so all ships
+                // spawn clear of the mothership sprite (radius ≈ 45 wu).
+                PointF center = new PointF(ms.Position.X, ms.Position.Y - 160f);
+
+                const float rowSpacing = 15f;
+                const float colSpacing = 15f;
+
+                int idx = 0;
+                for (int row = 0; idx < count; row++)
+                {
+                    int   shipsInRow = Math.Min(row + 1, count - idx);
+                    float rear       = row * rowSpacing;
+
+                    for (int i = 0; i < shipsInRow; i++, idx++)
+                    {
+                        float lat = shipsInRow == 1
+                            ? 0f
+                            : (-row / 2.0f + (float)i * row / (shipsInRow - 1)) * colSpacing;
+
+                        spawnPositions[idx] = new PointF(
+                            center.X + lat * right.X - rear * fwd.X,
+                            center.Y + lat * right.Y - rear * fwd.Y);
+                    }
+                }
+            }
+            else
+            {
+                spawnPositions[0] = ShipFactory.RandomOffset(ms.Position, 80);
+            }
+
             for (int i = 0; i < count; i++)
             {
-                var spawnPos = ShipFactory.RandomOffset(ms.Position, 80);
-                var newShip  = ShipFactory.Create(order.Type, spawnPos, isPlayer);
+                var newShip  = ShipFactory.Create(order.Type, spawnPositions[i], isPlayer);
                 newShip.TeamId = ms.TeamId;
                 if (isPlayer)
                 {
@@ -390,6 +429,7 @@ namespace FleetCommand
             {
                 a.AttackTarget        = target;
                 a.Destination         = null;
+                a.FormationWaypoint   = null;
                 a.IsMining            = false;
                 a.ReturningToMothership = false;
             }

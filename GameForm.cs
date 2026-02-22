@@ -861,145 +861,6 @@ namespace FleetCommand
             else if (e.Button == MouseButtons.Right)
             {
                 dragStart = e.Location; panLastPos = e.Location;
-                var worldPt = ScreenToWorld(e.Location);
-
-                var enemy = world.Ships.Where(s => !s.IsPlayerOwned && s.IsAlive)
-                    .FirstOrDefault(s => s.HitTest(worldPt, GetShipHitRadius(s.Type)));
-                if (enemy != null)
-                {
-                    foreach (var s in world.Ships) s.IsTargeted = false;
-                    var atk = selectedShips.Where(s => s.IsAlive).ToList();
-                    if (atk.Count > 0) { world.AssignAttackTarget(atk, enemy); return; }
-                }
-
-                var ast = world.Asteroids.FirstOrDefault(a => a.IsAlive && a.HitTest(worldPt));
-                if (ast != null)
-                {
-                    var miners = selectedShips.OfType<Miner>().ToList();
-                    if (miners.Count > 0) { world.AssignMiners(miners, ast); world.LogEvent($"{miners.Count} miner(s) → asteroid"); return; }
-                }
-
-                // ── Categorise selected ships into three formation groups ──────
-                var workers       = new List<Ship>();
-                var lightFighters = new List<Ship>();
-                var capitals      = new List<Ship>();
-
-                foreach (var s in selectedShips)
-                {
-                    if (!s.IsAlive) continue;
-                    switch (s.Type)
-                    {
-                        case ShipType.Interceptor:
-                        case ShipType.Bomber:
-                        case ShipType.Corvet:
-                            lightFighters.Add(s); break;
-                        case ShipType.Frigate:
-                        case ShipType.Destroyer:
-                        case ShipType.Battlecruiser:
-                            capitals.Add(s); break;
-                        default:   // Miner, ResourceCollector, Mothership
-                            workers.Add(s); break;
-                    }
-                }
-
-                // ── Workers: tight circle cluster ─────────────────────────────
-                int wCnt = workers.Count;
-                for (int i = 0; i < wCnt; i++)
-                {
-                    workers[i].AttackTarget = null;
-                    float spread = Math.Min(wCnt * 5f, 20f);
-                    double angle = i * Math.PI * 2 / Math.Max(wCnt, 1);
-                    workers[i].Destination = new PointF(
-                        worldPt.X + (float)Math.Cos(angle) * spread,
-                        worldPt.Y + (float)Math.Sin(angle) * spread);
-                    workers[i].IsMining = false;
-                    workers[i].ReturningToMothership = false;
-                }
-
-                // ── Light fighters: DELTA formation, groups of ≤5 ────────────
-                if (lightFighters.Count > 0)
-                {
-                    // Compute forward direction (centroid → worldPt)
-                    float cx = 0f, cy = 0f;
-                    foreach (var f in lightFighters) { cx += f.Position.X; cy += f.Position.Y; }
-                    cx /= lightFighters.Count; cy /= lightFighters.Count;
-
-                    float fdx = worldPt.X - cx, fdy = worldPt.Y - cy;
-                    float fdist = (float)Math.Sqrt(fdx * fdx + fdy * fdy);
-                    PointF fwd   = fdist < 1f
-                        ? new PointF(1f, 0f)
-                        : new PointF(fdx / fdist, fdy / fdist);
-                    PointF right = new PointF(fwd.Y, -fwd.X);   // 90° clockwise
-
-                    // Delta slot offsets: (rightward, rearward) in world units
-                    // Slot 0 = tip (at groupCenter), slots 1-4 trail behind
-                    var slots = new PointF[]
-                    {
-                        new PointF(  0f,   0f),   // tip
-                        new PointF(-10f,  15f),   // left wing
-                        new PointF( 10f,  15f),   // right wing
-                        new PointF(-20f,  30f),   // left rear
-                        new PointF( 20f,  30f),   // right rear
-                    };
-
-                    const int   grpMax     = 5;
-                    const float grpSpacing = 110f;
-                    int numGroups = (lightFighters.Count + grpMax - 1) / grpMax;
-
-                    for (int gi = 0; gi < numGroups; gi++)
-                    {
-                        // Spread groups perpendicularly so they don't stack
-                        float gOff = (gi - (numGroups - 1) / 2.0f) * grpSpacing;
-                        PointF gCenter = new PointF(
-                            worldPt.X + gOff * right.X,
-                            worldPt.Y + gOff * right.Y);
-
-                        int start = gi * grpMax;
-                        int end   = Math.Min(start + grpMax, lightFighters.Count);
-                        for (int si = start; si < end; si++)
-                        {
-                            PointF slot = slots[si - start];
-                            // slot.X along right, slot.Y opposite to fwd (rearward)
-                            lightFighters[si].AttackTarget = null;
-                            lightFighters[si].Destination  = new PointF(
-                                gCenter.X + slot.X * right.X - slot.Y * fwd.X,
-                                gCenter.Y + slot.X * right.Y - slot.Y * fwd.Y);
-                            lightFighters[si].IsMining = false;
-                            lightFighters[si].ReturningToMothership = false;
-                        }
-                    }
-                }
-
-                // ── Capitals: WALL formation (line abreast, ⊥ to travel) ──────
-                if (capitals.Count > 0)
-                {
-                    float cx = 0f, cy = 0f;
-                    foreach (var c in capitals) { cx += c.Position.X; cy += c.Position.Y; }
-                    cx /= capitals.Count; cy /= capitals.Count;
-
-                    float fdx = worldPt.X - cx, fdy = worldPt.Y - cy;
-                    float fdist = (float)Math.Sqrt(fdx * fdx + fdy * fdy);
-                    PointF fwd   = fdist < 1f
-                        ? new PointF(1f, 0f)
-                        : new PointF(fdx / fdist, fdy / fdist);
-                    PointF right = new PointF(fwd.Y, -fwd.X);   // 90° clockwise
-
-                    // Space ships evenly along the perpendicular axis, centred on worldPt.
-                    // 55 wu gap accommodates the widths of Frigate (44), Destroyer (66),
-                    // and Battlecruiser (94) with a small margin between hulls.
-                    const float wallSpacing = 55f;
-                    int n = capitals.Count;
-                    for (int i = 0; i < n; i++)
-                    {
-                        float wallOff = (i - (n - 1) / 2.0f) * wallSpacing;
-                        capitals[i].AttackTarget = null;
-                        capitals[i].Destination  = new PointF(
-                            worldPt.X + wallOff * right.X,
-                            worldPt.Y + wallOff * right.Y);
-                        capitals[i].IsMining = false;
-                        capitals[i].ReturningToMothership = false;
-                    }
-                }
             }
         }
 
@@ -1021,8 +882,147 @@ namespace FleetCommand
             }
             else if (e.Button == MouseButtons.Right)
             {
+                bool wasPanning = isPanning;
                 if (isPanning) { isPanning = false; Cursor = Cursors.Default; }
                 dragRect = RectangleF.Empty; dragStart = null;
+
+                if (!wasPanning)
+                {
+                    var worldPt = ScreenToWorld(e.Location);
+
+                    var enemy = world.Ships.Where(s => !s.IsPlayerOwned && s.IsAlive)
+                        .FirstOrDefault(s => s.HitTest(worldPt, GetShipHitRadius(s.Type)));
+                    if (enemy != null)
+                    {
+                        foreach (var s in world.Ships) s.IsTargeted = false;
+                        var atk = selectedShips.Where(s => s.IsAlive).ToList();
+                        if (atk.Count > 0) { world.AssignAttackTarget(atk, enemy); return; }
+                    }
+
+                    var ast = world.Asteroids.FirstOrDefault(a => a.IsAlive && a.HitTest(worldPt));
+                    if (ast != null)
+                    {
+                        var miners = selectedShips.OfType<Miner>().ToList();
+                        if (miners.Count > 0) { world.AssignMiners(miners, ast); world.LogEvent($"{miners.Count} miner(s) → asteroid"); return; }
+                    }
+
+                    // ── Categorise selected ships into three formation groups ──────
+                    var workers       = new List<Ship>();
+                    var lightFighters = new List<Ship>();
+                    var capitals      = new List<Ship>();
+
+                    foreach (var s in selectedShips)
+                    {
+                        if (!s.IsAlive) continue;
+                        switch (s.Type)
+                        {
+                            case ShipType.Interceptor:
+                            case ShipType.Bomber:
+                            case ShipType.Corvet:
+                                lightFighters.Add(s); break;
+                            case ShipType.Frigate:
+                            case ShipType.Destroyer:
+                            case ShipType.Battlecruiser:
+                                capitals.Add(s); break;
+                            default:   // Miner, ResourceCollector, Mothership
+                                workers.Add(s); break;
+                        }
+                    }
+
+                    // ── Workers: tight circle cluster ─────────────────────────────
+                    int wCnt = workers.Count;
+                    for (int i = 0; i < wCnt; i++)
+                    {
+                        workers[i].AttackTarget       = null;
+                        workers[i].FormationWaypoint  = null;
+                        float spread = Math.Min(wCnt * 5f, 20f);
+                        double angle = i * Math.PI * 2 / Math.Max(wCnt, 1);
+                        workers[i].Destination = new PointF(
+                            worldPt.X + (float)Math.Cos(angle) * spread,
+                            worldPt.Y + (float)Math.Sin(angle) * spread);
+                        workers[i].IsMining = false;
+                        workers[i].ReturningToMothership = false;
+                    }
+
+                    // ── Light fighters: expanding DELTA (triangle) formation ─────
+                    if (lightFighters.Count > 0)
+                    {
+                        float cx = 0f, cy = 0f;
+                        foreach (var f in lightFighters) { cx += f.Position.X; cy += f.Position.Y; }
+                        cx /= lightFighters.Count; cy /= lightFighters.Count;
+
+                        float fdx = worldPt.X - cx, fdy = worldPt.Y - cy;
+                        float fdist = (float)Math.Sqrt(fdx * fdx + fdy * fdy);
+                        PointF fwd   = fdist < 1f
+                            ? new PointF(1f, 0f)
+                            : new PointF(fdx / fdist, fdy / fdist);
+                        PointF right = new PointF(fwd.Y, -fwd.X);   // 90° clockwise
+
+                        // Row 0 = 1-ship tip, row 1 = 2 ships, row 2 = 3 ships, …
+                        // Partial last rows are spread to the full row width so the
+                        // triangle silhouette is preserved for any ship count.
+                        const float rowSpacing =15f;
+                        const float colSpacing = 15f;
+
+                        int n = lightFighters.Count, idx = 0;
+                        for (int row = 0; idx < n; row++)
+                        {
+                            int   shipsInRow = Math.Min(row + 1, n - idx);
+                            float rear       = row * rowSpacing;
+
+                            for (int i = 0; i < shipsInRow; i++, idx++)
+                            {
+                                float lat = shipsInRow == 1
+                                    ? 0f
+                                    : (-row / 2.0f + (float)i * row / (shipsInRow - 1)) * colSpacing;
+
+                                lightFighters[idx].AttackTarget      = null;
+                                lightFighters[idx].FormationWaypoint = new PointF(
+                                    cx        + lat * right.X - rear * fwd.X,
+                                    cy        + lat * right.Y - rear * fwd.Y);
+                                lightFighters[idx].Destination       = new PointF(
+                                    worldPt.X + lat * right.X - rear * fwd.X,
+                                    worldPt.Y + lat * right.Y - rear * fwd.Y);
+                                lightFighters[idx].IsMining = false;
+                                lightFighters[idx].ReturningToMothership = false;
+                            }
+                        }
+                    }
+
+                    // ── Capitals: WALL formation (line abreast, ⊥ to travel) ──────
+                    if (capitals.Count > 0)
+                    {
+                        float cx = 0f, cy = 0f;
+                        foreach (var c in capitals) { cx += c.Position.X; cy += c.Position.Y; }
+                        cx /= capitals.Count; cy /= capitals.Count;
+
+                        float fdx = worldPt.X - cx, fdy = worldPt.Y - cy;
+                        float fdist = (float)Math.Sqrt(fdx * fdx + fdy * fdy);
+                        PointF fwd   = fdist < 1f
+                            ? new PointF(1f, 0f)
+                            : new PointF(fdx / fdist, fdy / fdist);
+                        PointF right = new PointF(fwd.Y, -fwd.X);   // 90° clockwise
+
+                        // Space ships evenly along the perpendicular axis, centred on worldPt.
+                        // 55 wu gap accommodates the widths of Frigate (44), Destroyer (66),
+                        // and Battlecruiser (94) with a small margin between hulls.
+                        const float wallSpacing = 55f;
+                        int n = capitals.Count;
+                        for (int i = 0; i < n; i++)
+                        {
+                            float wallOff = (i - (n - 1) / 2.0f) * wallSpacing;
+                            capitals[i].AttackTarget      = null;
+                            capitals[i].FormationWaypoint = new PointF(
+                                cx        + wallOff * right.X,
+                                cy        + wallOff * right.Y);
+                            capitals[i].Destination       = new PointF(
+                                worldPt.X + wallOff * right.X,
+                                worldPt.Y + wallOff * right.Y);
+                            capitals[i].IsMining = false;
+                            capitals[i].ReturningToMothership = false;
+                        }
+                    }
+                }
             }
         }
 

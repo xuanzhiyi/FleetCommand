@@ -9,7 +9,8 @@ namespace FleetCommand
     {
         public ShipType  Type          { get; protected set; }
         public PointF    Position      { get; set; }
-        public PointF?   Destination   { get; set; }
+        public PointF?   Destination       { get; set; }
+        public PointF?   FormationWaypoint { get; set; }
         public float     HP            { get; set; }
         public float     MaxHPValue    { get; set; }
         public int       UpgradeLevel  { get; set; }
@@ -100,14 +101,18 @@ namespace FleetCommand
 
         protected void MoveTowardDestination()
         {
-            if (!Destination.HasValue) return;
-            float dx   = Destination.Value.X - Position.X;
-            float dy   = Destination.Value.Y - Position.Y;
+            PointF? target = FormationWaypoint ?? Destination;
+            if (!target.HasValue) return;
+            float dx   = target.Value.X - Position.X;
+            float dy   = target.Value.Y - Position.Y;
             float dist = (float)Math.Sqrt(dx * dx + dy * dy);
             if (dist < Speed)
             {
-                Position    = Destination.Value;
-                Destination = null;
+                Position = target.Value;
+                if (FormationWaypoint.HasValue)
+                    FormationWaypoint = null;   // phase 1 done; next tick moves toward Destination
+                else
+                    Destination = null;
             }
             else
             {
