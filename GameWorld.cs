@@ -351,19 +351,38 @@ namespace FleetCommand
         private void SpawnEffect(PointF from, PointF to, ShipType attackerType, bool isPlayer)
         {
             if (CombatEffects.Count > 120) return;
+
             CombatEffectKind kind;
-            if (attackerType == ShipType.Bomber)
-                kind = CombatEffectKind.Bomb;
-            else if (!isPlayer)
-                kind = CombatEffectKind.LaserRed;
-            else if (attackerType == ShipType.Interceptor || attackerType == ShipType.Corvet)
-                kind = CombatEffectKind.LaserGreen;
-            else
-                kind = CombatEffectKind.PlasmaBlue;
-            var jitter = new PointF(
-                to.X + (float)(rng.NextDouble() - 0.5) * 6,
-                to.Y + (float)(rng.NextDouble() - 0.5) * 6);
-            CombatEffects.Add(new CombatEffect(from, jitter, kind));
+            switch (attackerType)
+            {
+                // ── Fighters ──────────────────────────────────────────────────
+                case ShipType.Interceptor:
+                    kind = CombatEffectKind.Missile;      break;   // fast projectile bullet
+                case ShipType.Bomber:
+                    kind = CombatEffectKind.Bomb;         break;   // slow bomb + explosion rings
+                case ShipType.Corvet:
+                    kind = isPlayer ? CombatEffectKind.LaserGreen
+                                    : CombatEffectKind.LaserRed;   break;   // instant laser
+                // ── Capitals ──────────────────────────────────────────────────
+                case ShipType.Frigate:
+                    kind = CombatEffectKind.FrigateShot;  break;   // flak ball + slash shrapnel
+                case ShipType.Destroyer:
+                case ShipType.Battlecruiser:
+                    kind = CombatEffectKind.IonCannon;    break;   // wide electric beam
+                // ── Mothership / Carrier / unknown ────────────────────────────
+                default:
+                    kind = isPlayer ? CombatEffectKind.PlasmaBlue
+                                    : CombatEffectKind.LaserRed;   break;
+            }
+
+            // Small target jitter (not applied for missile/bomb — they travel to exact To)
+            PointF dest = (kind == CombatEffectKind.Missile || kind == CombatEffectKind.Bomb
+                           || kind == CombatEffectKind.FrigateShot)
+                ? to
+                : new PointF(to.X + (float)(rng.NextDouble() - 0.5) * 5,
+                             to.Y + (float)(rng.NextDouble() - 0.5) * 5);
+
+            CombatEffects.Add(new CombatEffect(from, dest, kind));
         }
 
         private void ResolveRepairs(int deltaMs)

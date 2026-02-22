@@ -67,16 +67,19 @@ namespace FleetCommand
             if (attacker == ShipType.Interceptor &&
                 target   == ShipType.Bomber)                                     return 1.75f;
 
-			if (attacker == ShipType.Corvet &&
-				(target == ShipType.Interceptor || target == ShipType.Bomber)) return 1.75f;
+            if (attacker == ShipType.Corvet &&
+                (target == ShipType.Interceptor || target == ShipType.Bomber))  return 1.75f;
 
-			if (attacker == ShipType.Bomber &&
-                (target == ShipType.Mothership || target == ShipType.Battlecruiser || target == ShipType.Destroyer)) return 1.75f;
+            if (attacker == ShipType.Bomber &&
+                (target == ShipType.Mothership || target == ShipType.Battlecruiser ||
+                 target == ShipType.Destroyer))                                  return 1.75f;
 
-			if (attacker == ShipType.Frigate &&
-				target == ShipType.Corvet)                                       return 1.75f;
+            // Frigate fires flak/shrapnel — lethal against ALL fighter types
+            if (attacker == ShipType.Frigate &&
+                (target == ShipType.Interceptor || target == ShipType.Bomber ||
+                 target == ShipType.Corvet))                                     return 1.75f;
 
-			if (attacker == ShipType.Destroyer &&
+            if (attacker == ShipType.Destroyer &&
                 target   == ShipType.Frigate)                                    return 1.75f;
 
             if (attacker == ShipType.Battlecruiser &&
@@ -86,7 +89,8 @@ namespace FleetCommand
             if (attacker == ShipType.Bomber &&
                 target   == ShipType.Interceptor)                                return 0.60f;
 
-            if ((attacker == ShipType.Mothership || attacker == ShipType.Battlecruiser || attacker == ShipType.Destroyer) &&
+            if ((attacker == ShipType.Mothership || attacker == ShipType.Battlecruiser ||
+                 attacker == ShipType.Destroyer) &&
                 target   == ShipType.Bomber)                                     return 0.60f;
 
             if (attacker == ShipType.Frigate &&
