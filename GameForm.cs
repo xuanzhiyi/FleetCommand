@@ -32,6 +32,8 @@ namespace FleetCommand
         private List<Ship> selectedShips = new List<Ship>();
         private PointF? dragStart;
         private RectangleF dragRect = RectangleF.Empty;
+        private Ship _groupSelectAnchor = null;   // tracks the ship clicked for group-select
+        private const float GroupSelectRadius = 300f;
 
         // Panning
         private bool isPanning;
@@ -851,10 +853,30 @@ namespace FleetCommand
                 if (clicked != null)
                 {
                     if (!ModifierKeys.HasFlag(Keys.Shift)) { foreach (var s in selectedShips) s.IsSelected = false; selectedShips.Clear(); }
-                    clicked.IsSelected = true;
-                    if (!selectedShips.Contains(clicked)) selectedShips.Add(clicked);
+
+                    if (clicked == _groupSelectAnchor)
+                    {
+                        // Second click on the same ship → narrow to just this ship
+                        clicked.IsSelected = true;
+                        selectedShips.Add(clicked);
+                        _groupSelectAnchor = null;
+                    }
+                    else
+                    {
+                        // First click → select all same-type ships within GroupSelectRadius
+                        float r2 = GroupSelectRadius * GroupSelectRadius;
+                        var group = world.Ships.Where(s => s.IsPlayerOwned && s.IsAlive
+                            && s.Type == clicked.Type
+                            && (s.Position.X - clicked.Position.X) * (s.Position.X - clicked.Position.X)
+                             + (s.Position.Y - clicked.Position.Y) * (s.Position.Y - clicked.Position.Y) <= r2)
+                            .ToList();
+                        foreach (var s in group) { s.IsSelected = true; if (!selectedShips.Contains(s)) selectedShips.Add(s); }
+                        _groupSelectAnchor = clicked;
+                    }
                     return;
                 }
+                // Clicked empty space → start drag-select; reset group anchor
+                _groupSelectAnchor = null;
                 dragStart = e.Location; panLastPos = e.Location;
                 if (!ModifierKeys.HasFlag(Keys.Shift)) { foreach (var s in selectedShips) s.IsSelected = false; selectedShips.Clear(); }
             }
@@ -877,6 +899,7 @@ namespace FleetCommand
                         && s.Type != ShipType.Mothership && wr.Contains(s.Position)).ToList();
                     if (!ModifierKeys.HasFlag(Keys.Shift)) { foreach (var s in selectedShips) s.IsSelected = false; selectedShips.Clear(); }
                     foreach (var s in inRect) { s.IsSelected = true; if (!selectedShips.Contains(s)) selectedShips.Add(s); }
+                    _groupSelectAnchor = null;   // drag-select replaces the click-select state
                 }
                 dragRect = RectangleF.Empty; dragStart = null;
             }
@@ -1092,7 +1115,7 @@ namespace FleetCommand
                 case ShipType.Miner: return 12;
                 case ShipType.Interceptor:
                 case ShipType.Bomber: return 10;
-                case ShipType.Corvet: return 14;
+                case ShipType.Corvet: return 11;
                 case ShipType.Frigate: return 18;
                 case ShipType.Destroyer: return 22;
                 case ShipType.Battlecruiser: return 30;

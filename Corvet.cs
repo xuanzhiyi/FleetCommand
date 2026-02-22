@@ -13,7 +13,7 @@ namespace FleetCommand
         {
             float sx = (Position.X + offset.X) * zoom;
             float sy = (Position.Y + offset.Y) * zoom;
-            float s  = 12 * zoom;
+            float s  = 9 * zoom;
             var   color = GetShipColor();
             var   rect  = new RectangleF(sx - s, sy - s, s * 2, s * 2);
             using (var pen   = new Pen(color, IsSelected ? 2f : 1f))

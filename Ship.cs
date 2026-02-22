@@ -69,11 +69,38 @@ namespace FleetCommand
                     float dx    = AttackTarget.Position.X - Position.X;
                     float dy    = AttackTarget.Position.Y - Position.Y;
                     float dist  = (float)Math.Sqrt(dx * dx + dy * dy);
-                    if (dist > range * 0.85f)
+
+                    bool isFighter = Type == ShipType.Interceptor
+                                  || Type == ShipType.Bomber
+                                  || Type == ShipType.Corvet;
+                    if (isFighter)
                     {
-                        Position = new PointF(
-                            Position.X + dx / dist * Speed,
-                            Position.Y + dy / dist * Speed);
+                        if (dist > range)
+                        {
+                            // Close in until within attack range
+                            Position = new PointF(
+                                Position.X + dx / dist * Speed,
+                                Position.Y + dy / dist * Speed);
+                        }
+                        else
+                        {
+                            // Orbit clockwise: tangent = 90° CW rotation of toward-target
+                            float tangentX =  dy / dist;
+                            float tangentY = -dx / dist;
+                            Position = new PointF(
+                                Position.X + tangentX * Speed,
+                                Position.Y + tangentY * Speed);
+                        }
+                    }
+                    else
+                    {
+                        // Capitals: advance to 85 % of range then hold position
+                        if (dist > range * 0.85f)
+                        {
+                            Position = new PointF(
+                                Position.X + dx / dist * Speed,
+                                Position.Y + dy / dist * Speed);
+                        }
                     }
                     return;
                 }

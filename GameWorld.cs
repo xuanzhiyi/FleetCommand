@@ -190,7 +190,9 @@ namespace FleetCommand
             if (!order.IsComplete) return;
 
             ms.BuildQueue.RemoveAt(0);
-            int count = (order.Type == ShipType.Interceptor || order.Type == ShipType.Bomber) ? 5 : 1;
+            int count = order.Type == ShipType.Interceptor || order.Type == ShipType.Bomber ? 5
+                      : order.Type == ShipType.Corvet ? 3
+                      : 1;
 
             // Precompute spawn positions — fighter squadrons appear in a delta.
             PointF[] spawnPositions = new PointF[count];
@@ -241,6 +243,16 @@ namespace FleetCommand
                     newShip.UpgradeLevel = Research.Levels[order.Type];
                 }
                 Ships.Add(newShip);
+
+                // New miners automatically head to the nearest live asteroid.
+                if (order.Type == ShipType.Miner)
+                {
+                    var miner   = (Miner)newShip;
+                    var nearest = Asteroids.Where(a => a.IsAlive)
+                                           .OrderBy(a => Dist(miner.Position, a.Position))
+                                           .FirstOrDefault();
+                    if (nearest != null) { miner.TargetAsteroid = nearest; miner.IsMining = true; }
+                }
             }
             if (isPlayer)
                 LogEvent($"{order.Type} built!{(count > 1 ? $" Squadron of {count}" : "")}");
@@ -402,7 +414,9 @@ namespace FleetCommand
 
             // Fleet cap: count live ships + queued spawns for this type
             int cap         = GameConstants.FleetCaps[(int)type];
-            int spawnCount  = (type == ShipType.Interceptor || type == ShipType.Bomber) ? 5 : 1;
+            int spawnCount  = type == ShipType.Interceptor || type == ShipType.Bomber ? 5
+                            : type == ShipType.Corvet ? 3
+                            : 1;
             int live        = Ships.Count(s => s.IsAlive && s.TeamId == 0 && s.Type == type);
             int queued      = PlayerMothership.BuildQueue.Count(q => q.Type == type) * spawnCount;
             if (live + queued + spawnCount > cap) return false;

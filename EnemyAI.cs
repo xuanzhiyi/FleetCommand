@@ -220,7 +220,9 @@ namespace FleetCommand
 
             // Fleet cap: count live ships + queued spawns for this type on our team
             int cap        = GameConstants.FleetCaps[(int)type];
-            int spawnCount = (type == ShipType.Interceptor || type == ShipType.Bomber) ? 5 : 1;
+            int spawnCount = type == ShipType.Interceptor || type == ShipType.Bomber ? 5
+                           : type == ShipType.Corvet ? 3
+                           : 1;
             int live       = allShips.Count(s => s.IsAlive && s.TeamId == Mothership.TeamId && s.Type == type);
             int queued     = Mothership.BuildQueue.Count(q => q.Type == type) * spawnCount;
             if (live + queued + spawnCount > cap) return;

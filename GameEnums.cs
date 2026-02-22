@@ -27,10 +27,10 @@ namespace FleetCommand
             0, 5000, 6000, 10000, 12000, 15000, 30000, 45000, 12000
         };
         public static readonly int[] MaxHP = {
-            12000, 100, 200, 220, 260, 500, 3000, 10000, 600
+            12000, 100, 200, 220, 180, 500, 3000, 10000, 600
         };
         public static readonly float[] Damage = {
-            1.0f, 0, 0.3f, 0.5f, 0.4f, 0.7f, 1.2f, 2.5f, 0
+            1.0f, 0, 0.3f, 0.5f, 0.3f, 0.7f, 1.2f, 2.5f, 0
         };
         public static readonly float[] Speeds = {
             0.5f, 1.5f, 3.5f, 2.5f, 3.0f, 1.8f, 1.3f, 1.0f, 1.2f
