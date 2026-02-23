@@ -72,7 +72,7 @@ namespace FleetCommand
 
                     bool isFighter = Type == ShipType.Interceptor
                                   || Type == ShipType.Bomber
-                                  || Type == ShipType.Corvet;
+                                  || Type == ShipType.Corvette;
                     if (isFighter)
                     {
                         if (dist > range)
@@ -117,7 +117,7 @@ namespace FleetCommand
             {
                 case ShipType.Interceptor:   return 40;
                 case ShipType.Bomber:        return 60;
-                case ShipType.Corvet:        return 55;
+                case ShipType.Corvette:        return 55;
                 case ShipType.Frigate:       return 70;
                 case ShipType.Destroyer:     return 90;
                 case ShipType.Battlecruiser: return 120;

@@ -29,10 +29,10 @@ namespace FleetCommand
             switch (type)
             {
                 case ShipType.Mothership:         return new Mothership(position, isPlayer);
-                case ShipType.Miner:              return new Miner(position, isPlayer);
+                case ShipType.Worker:              return new Miner(position, isPlayer);
                 case ShipType.Interceptor:        return new Interceptor(position, isPlayer);
                 case ShipType.Bomber:             return new Bomber(position, isPlayer);
-                case ShipType.Corvet:             return new Corvet(position, isPlayer);
+                case ShipType.Corvette:           return new Corvette(position, isPlayer);
                 case ShipType.Frigate:            return new Frigate(position, isPlayer);
                 case ShipType.Destroyer:          return new Destroyer(position, isPlayer);
                 case ShipType.Battlecruiser:      return new Battlecruiser(position, isPlayer);

@@ -56,10 +56,10 @@ namespace FleetCommand
                 {
                     // Sized slightly wider than the full parallelogram span
                     // (w + skew on each side), with a landscape aspect ratio.
-                    float sz   = (w + skew) * 2.1f;
-                    var   dest = new Rectangle((int)(sx - sz * 0.5f),
-                                               (int)(sy - sz * 0.4f),
-                                               (int)sz, (int)(sz * 0.8f));
+         
+                    var   dest = new Rectangle((int)(sx - w * 1.3f),
+                                               (int)(sy - h * 1.3f),
+											   (int)(w * 2.6f), (int)(h * 2.6f));
 
                     using (var ia = new System.Drawing.Imaging.ImageAttributes())
                     {

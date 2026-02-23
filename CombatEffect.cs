@@ -7,9 +7,9 @@ namespace FleetCommand
     // ── Combat Effect Kinds ───────────────────────────────────────────────────
     public enum CombatEffectKind
     {
-        LaserGreen,    // Corvet (player)   — instant thin laser line, green
-        LaserRed,      // Corvet (enemy)    — instant thin laser line, red
-        PlasmaBlue,    // Mothership/Carrier — wide plasma beam, blue
+        LaserGreen,    // Corvette (player)   — instant thin laser line, green
+		LaserRed,      // Corvette (enemy)    — instant thin laser line, red
+		PlasmaBlue,    // Mothership/Carrier — wide plasma beam, blue
         Missile,       // Interceptor       — fast-moving projectile bullet + impact flash
         Bomb,          // Bomber            — slow projectile bomb + expanding explosion rings
         IonCannon,     // Destroyer/BC      — wide electric arc beam, blue-white

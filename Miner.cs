@@ -21,7 +21,24 @@ namespace FleetCommand
         public float OffloadProgress => ReturningToMothership && IsOffloading ? (float)offloadTimer / OffloadDelayMs : 0f;
         public bool  IsOffloading    { get; private set; }
 
-        public Miner(PointF position, bool isPlayer) : base(ShipType.Miner, position, isPlayer)
+		private const float SpriteZoom = 1.8f;
+
+		private static Bitmap _sprite;
+		private static readonly object _spriteLock = new object();
+
+		private static Bitmap GetSprite()
+		{
+			if (_sprite != null) return _sprite;
+			lock (_spriteLock)
+			{
+				if (_sprite != null) return _sprite;
+				try { _sprite = new Bitmap(Properties.Resources.Worker); }
+				catch { _sprite = null; }   // falls back to polygon if image missing
+			}
+			return _sprite;
+		}
+
+		public Miner(PointF position, bool isPlayer) : base(ShipType.Worker, position, isPlayer)
         {
             Label = "worker";
         }
@@ -117,13 +134,45 @@ namespace FleetCommand
             float sy = (Position.Y + offset.Y) * zoom;
             float r  = 10 * zoom;
             var   color = GetShipColor();
-            using (var pen   = new Pen(color, IsSelected ? 2f : 1f))
-            using (var brush = new SolidBrush(Color.FromArgb(50, color)))
+
+            if (zoom >= SpriteZoom)
             {
-                g.FillEllipse(brush, sx - r, sy - r, r * 2, r * 2);
-                g.DrawEllipse(pen,   sx - r, sy - r, r * 2, r * 2);
-                if (IsMining)
-                    g.DrawEllipse(new Pen(Color.Yellow, 1), sx - r - 3, sy - r - 3, (r + 3) * 2, (r + 3) * 2);
+                // ── Sprite mode ───────────────────────────────────────────────
+                var sprite = GetSprite();
+                if (sprite != null)
+                {
+                    // Sized slightly wider than the full parallelogram span
+                    // (w + skew on each side), with a landscape aspect ratio.
+                    var dest = new Rectangle((int)(sx - r),
+                                               (int)(sy - r),
+                                               (int)(r * 2f), (int)(r * 2f));
+
+                    using (var ia = new System.Drawing.Imaging.ImageAttributes())
+                    {
+                        // Key out near-black background (0,0,0) → (20,20,20)
+                        ia.SetColorKey(Color.FromArgb(0, 0, 0),
+                                       Color.FromArgb(20, 20, 20));
+                        g.DrawImage(sprite, dest,
+                                    0, 0, sprite.Width, sprite.Height,
+                                    GraphicsUnit.Pixel, ia);
+                    }
+                }
+                int ringAlpha = IsSelected ? 220 : 90;
+                using (var pen = new Pen(Color.FromArgb(ringAlpha, GetShipColor()),
+                                         IsSelected ? 2.5f : 1.5f))
+                    g.DrawEllipse(pen, sx - r - 3, sy - r - 3, (r + 3) * 2, (r + 3) * 2);
+			}
+            else
+            {
+
+                using (var pen = new Pen(color, IsSelected ? 2f : 1f))
+                using (var brush = new SolidBrush(Color.FromArgb(50, color)))
+                {
+                    g.FillEllipse(brush, sx - r, sy - r, r * 2, r * 2);
+                    g.DrawEllipse(pen, sx - r, sy - r, r * 2, r * 2);
+                    if (IsMining)
+                        g.DrawEllipse(new Pen(Color.Yellow, 1), sx - r - 3, sy - r - 3, (r + 3) * 2, (r + 3) * 2);
+                }
             }
 
             // Mining progress arc (yellow) — sweeps around as the 4s delay counts up

@@ -39,20 +39,36 @@ namespace FleetCommand
             // Starting miners for player
             for (int i = 0; i < GameConstants.StartingMiners; i++)
             {
-                var m = (Miner)ShipFactory.Create(ShipType.Miner,
+                var m = (Miner)ShipFactory.Create(ShipType.Worker,
                     ShipFactory.RandomOffset(PlayerMothership.Position, 80), true);
                 m.TeamId = 0;
                 Ships.Add(m);
             }
 
-			//debug
-			//var carrier = new Carrier(new PointF(450, GameConstants.MapHeight / 2f), true);
-			//carrier.TeamId = 0;
-			//Ships.Add(carrier);
+            //debug
+   //         var carrier = new Carrier(new PointF(450, GameConstants.MapHeight / 2f-100), true);
+   //         carrier.TeamId = 0;
+   //         Ships.Add(carrier);
+
+   //         var battle = new Battlecruiser(new PointF(500, GameConstants.MapHeight / 2f + 100), true);
+   //         battle.TeamId = 0;
+   //         Ships.Add(battle);
+
+   //         var fighter = new Interceptor(new PointF(600, GameConstants.MapHeight / 2f + 200), true);
+   //         fighter.TeamId = 0;
+   //         Ships.Add(fighter);
+
+			//var destroyer = new Destroyer(new PointF(600, GameConstants.MapHeight / 2f + 100), true);
+			//destroyer.TeamId = 0;
+			//Ships.Add(destroyer);
+
+			//var frigate = new Frigate(new PointF(600, GameConstants.MapHeight / 2f), true);
+			//frigate.TeamId = 0;
+			//Ships.Add(frigate);
 
 			// ── Enemy AIs ─────────────────────────────────────────────────────
 			// Place motherships evenly on the right half of the map
-			int   count  = enemyLevels.Count;
+			int count  = enemyLevels.Count;
             float startY = GameConstants.MapHeight * 0.2f;
             float stepY  = GameConstants.MapHeight * 0.6f / Math.Max(1, count - 1);
             if (count == 1) startY = GameConstants.MapHeight / 2f;
@@ -70,7 +86,7 @@ namespace FleetCommand
                 // Starting miners for this AI
                 for (int j = 0; j < GameConstants.StartingMiners; j++)
                 {
-                    var m = (Miner)ShipFactory.Create(ShipType.Miner,
+                    var m = (Miner)ShipFactory.Create(ShipType.Worker,
                         ShipFactory.RandomOffset(ms.Position, 80), false);
                     m.TeamId = tid;
                     Ships.Add(m);
@@ -204,7 +220,7 @@ namespace FleetCommand
 
             ms.BuildQueue.RemoveAt(0);
             int count = order.Type == ShipType.Interceptor || order.Type == ShipType.Bomber ? 5
-                      : order.Type == ShipType.Corvet ? 3
+                      : order.Type == ShipType.Corvette ? 3
                       : 1;
 
             // Precompute spawn positions — fighter squadrons appear in a delta.
@@ -258,7 +274,7 @@ namespace FleetCommand
                 Ships.Add(newShip);
 
                 // New miners automatically head to the nearest live asteroid.
-                if (order.Type == ShipType.Miner)
+                if (order.Type == ShipType.Worker)
                 {
                     var miner   = (Miner)newShip;
                     var nearest = Asteroids.Where(a => a.IsAlive)
@@ -284,7 +300,7 @@ namespace FleetCommand
             // Player ships fire at enemies
             foreach (var ps in playerShips)
             {
-                if (ps.Type == ShipType.Miner || ps.Type == ShipType.ResourceCollector) continue;
+                if (ps.Type == ShipType.Worker || ps.Type == ShipType.ResourceCollector) continue;
                 float range = ps.GetAttackRange();
                 float dmg   = ps.GetDamage();
 
@@ -321,7 +337,7 @@ namespace FleetCommand
             // Enemy ships fire at player
             foreach (var es in allEnemyShips)
             {
-                if (es.Type == ShipType.Miner || es.Type == ShipType.ResourceCollector) continue;
+                if (es.Type == ShipType.Worker || es.Type == ShipType.ResourceCollector) continue;
                 float range = es.GetAttackRange();
                 float dmg   = es.GetDamage();
 
@@ -337,7 +353,7 @@ namespace FleetCommand
                 }
                 foreach (var ps in playerShips)
                 {
-                    if (ps.Type == ShipType.Miner || ps.Type == ShipType.ResourceCollector) continue;
+                    if (ps.Type == ShipType.Worker || ps.Type == ShipType.ResourceCollector) continue;
                     if (Dist(es.Position, ps.Position) <= range)
                     {
                         float mult = GameConstants.GetCombatMultiplier(es.Type, ps.Type);
@@ -360,7 +376,7 @@ namespace FleetCommand
                     kind = CombatEffectKind.Missile;      break;   // fast projectile bullet
                 case ShipType.Bomber:
                     kind = CombatEffectKind.Bomb;         break;   // slow bomb + explosion rings
-                case ShipType.Corvet:
+                case ShipType.Corvette:
                     kind = isPlayer ? CombatEffectKind.LaserGreen
                                     : CombatEffectKind.LaserRed;   break;   // instant laser
                 // ── Capitals ──────────────────────────────────────────────────
@@ -393,7 +409,7 @@ namespace FleetCommand
                  s.Type == ShipType.Carrier)).ToList();
             var lightShips = Ships.Where(s => s.IsAlive &&
                 (s.Type == ShipType.Interceptor || s.Type == ShipType.Bomber ||
-                 s.Type == ShipType.Miner       || s.Type == ShipType.Corvet)).ToList();
+                 s.Type == ShipType.Worker       || s.Type == ShipType.Corvette)).ToList();
 
             foreach (var ds in dockStations) ds.IsDocking = false;
             foreach (var f  in lightShips)   f.IsDocking  = false;
@@ -449,7 +465,7 @@ namespace FleetCommand
             // Fleet cap: count live ships + queued spawns for this type
             int cap         = GameConstants.FleetCaps[(int)type];
             int spawnCount  = type == ShipType.Interceptor || type == ShipType.Bomber ? 5
-                            : type == ShipType.Corvet ? 3
+                            : type == ShipType.Corvette ? 3
                             : 1;
             int live        = Ships.Count(s => s.IsAlive && s.TeamId == 0 && s.Type == type);
             int queued      = PlayerMothership.BuildQueue.Count(q => q.Type == type) * spawnCount;
@@ -472,7 +488,7 @@ namespace FleetCommand
 
             carrier.BuildQueue.RemoveAt(0);
             int count = order.Type == ShipType.Interceptor || order.Type == ShipType.Bomber ? 5
-                      : order.Type == ShipType.Corvet ? 3
+                      : order.Type == ShipType.Corvette ? 3
                       : 1;
 
             // Delta spawn formation above the carrier
@@ -515,7 +531,7 @@ namespace FleetCommand
                 newShip.UpgradeLevel = Research.Levels[order.Type];
                 Ships.Add(newShip);
 
-                if (order.Type == ShipType.Miner)
+                if (order.Type == ShipType.Worker)
                 {
                     var miner   = (Miner)newShip;
                     var nearest = Asteroids.Where(a => a.IsAlive)
@@ -538,7 +554,7 @@ namespace FleetCommand
 
             int cap        = GameConstants.FleetCaps[(int)type];
             int spawnCount = type == ShipType.Interceptor || type == ShipType.Bomber ? 5
-                           : type == ShipType.Corvet ? 3
+                           : type == ShipType.Corvette ? 3
                            : 1;
             int live   = Ships.Count(s => s.IsAlive && s.TeamId == 0 && s.Type == type);
             // Count queued from mothership + all carriers

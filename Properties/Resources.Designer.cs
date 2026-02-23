@@ -113,9 +113,39 @@ namespace FleetCommand.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap corvette {
+            get {
+                object obj = ResourceManager.GetObject("corvette", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap Destroyer {
             get {
                 object obj = ResourceManager.GetObject("Destroyer", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Frigate {
+            get {
+                object obj = ResourceManager.GetObject("Frigate", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap interceptor {
+            get {
+                object obj = ResourceManager.GetObject("interceptor", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -156,6 +186,16 @@ namespace FleetCommand.Properties {
         internal static System.Drawing.Bitmap wallpaper3 {
             get {
                 object obj = ResourceManager.GetObject("wallpaper3", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Worker {
+            get {
+                object obj = ResourceManager.GetObject("Worker", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

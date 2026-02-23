@@ -31,8 +31,8 @@ namespace FleetCommand
         {
             ShipType.Interceptor,
             ShipType.Bomber,
-            ShipType.Corvet,
-            ShipType.Miner,
+            ShipType.Corvette,
+            ShipType.Worker,
         };
 
         public Carrier(PointF position, bool isPlayer)
@@ -58,7 +58,7 @@ namespace FleetCommand
         {
             float sx  = (Position.X + offset.X) * zoom;
             float sy  = (Position.Y + offset.Y) * zoom;
-            float w   = 30 * zoom;   // half-width of flight deck
+            float w   = 40 * zoom;   // half-width of flight deck
             float h   = 30 * zoom;   // half-height of hull
             var   col = GetShipColor();
 
@@ -72,10 +72,9 @@ namespace FleetCommand
                 {
                     // Sized slightly wider than the full parallelogram span
                     // (w + skew on each side), with a landscape aspect ratio.
-                    float sz = w * 2.1f;
-                    var dest = new Rectangle((int)(sx - sz * 0.5f),
-                                               (int)(sy - sz * 0.4f),
-                                               (int)sz, (int)(sz * 0.8f));
+                    var dest = new Rectangle((int)(sx - w),
+                                               (int)(sy - h * 0.65f),
+                                               (int)(w*2), (int)(h));
 
                     using (var ia = new System.Drawing.Imaging.ImageAttributes())
                     {
@@ -83,7 +82,7 @@ namespace FleetCommand
                         ia.SetColorKey(Color.FromArgb(0, 0, 0),
                                        Color.FromArgb(20, 20, 20));
                         g.DrawImage(sprite, dest,
-                                    0, 0, sprite.Width, sprite.Height*1.3f,
+                                    0, 0, sprite.Width, sprite.Height,
                                     GraphicsUnit.Pixel, ia);
                     }
                 }
@@ -135,7 +134,7 @@ namespace FleetCommand
             }
 
             DrawHealthBar(g, hullRect);
-            DrawLabel(g, new PointF(sx, sy), h);
+            DrawLabel(g, new PointF(sx, sy), h*0.8f);
         }
     }
 }

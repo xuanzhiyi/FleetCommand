@@ -322,10 +322,10 @@ namespace FleetCommand
         // Mothership can build everything (including the Carrier itself)
         private static readonly (ShipType Type, bool Squad)[] MsBuildable =
         {
-            (ShipType.Miner,              false),
+            (ShipType.Worker,              false),
             (ShipType.Interceptor,        true),
             (ShipType.Bomber,             true),
-            (ShipType.Corvet,             false),
+            (ShipType.Corvette,             false),
             (ShipType.Frigate,            false),
             (ShipType.Destroyer,          false),
             (ShipType.Battlecruiser,      false),
@@ -338,8 +338,8 @@ namespace FleetCommand
         {
             (ShipType.Interceptor, true),
             (ShipType.Bomber,      true),
-            (ShipType.Corvet,      false),
-            (ShipType.Miner,       false),
+            (ShipType.Corvette,      false),
+            (ShipType.Worker,       false),
         };
 
         private Button MakeBuildButton(ShipType type, bool squad, int y, int w)
@@ -428,7 +428,7 @@ namespace FleetCommand
 
         private static readonly ShipType[] Researchable =
         {
-            ShipType.Miner, ShipType.Interceptor, ShipType.Bomber, ShipType.Corvet,
+            ShipType.Worker, ShipType.Interceptor, ShipType.Bomber, ShipType.Corvette,
             ShipType.Frigate, ShipType.Destroyer, ShipType.Battlecruiser, ShipType.Carrier,
         };
 
@@ -1032,7 +1032,7 @@ namespace FleetCommand
                     if (ast != null)
                     {
                         var miners = selectedShips.OfType<Miner>().ToList();
-                        if (miners.Count > 0) { world.AssignMiners(miners, ast); world.LogEvent($"{miners.Count} miner(s) → asteroid"); return; }
+                        if (miners.Count > 0) { world.AssignMiners(miners, ast); world.LogEvent($"{miners.Count} worker(s) → asteroid"); return; }
                     }
 
                     // ── Categorise selected ships into three formation groups ──────
@@ -1047,7 +1047,7 @@ namespace FleetCommand
                         {
                             case ShipType.Interceptor:
                             case ShipType.Bomber:
-                            case ShipType.Corvet:
+                            case ShipType.Corvette:
                                 lightFighters.Add(s); break;
                             case ShipType.Frigate:
                             case ShipType.Destroyer:
@@ -1219,10 +1219,10 @@ namespace FleetCommand
             switch (type)
             {
                 case ShipType.Mothership: return 45;
-                case ShipType.Miner: return 12;
+                case ShipType.Worker: return 12;
                 case ShipType.Interceptor:
                 case ShipType.Bomber: return 10;
-                case ShipType.Corvet: return 11;
+                case ShipType.Corvette: return 11;
                 case ShipType.Frigate: return 18;
                 case ShipType.Destroyer: return 22;
                 case ShipType.Battlecruiser: return 30;

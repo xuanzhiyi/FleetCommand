@@ -98,16 +98,16 @@ namespace FleetCommand
             if (Mothership.BuildQueue.Count >= GameConstants.AiBuildQueueMax[Idx]) return;
 
             var myShips  = allShips.Where(s => s.IsAlive && OwnedBy(s)).ToList();
-            int miners   = myShips.Count(s => s.Type == ShipType.Miner);
+            int miners   = myShips.Count(s => s.Type == ShipType.Worker);
             int combat   = myShips.Count(s => IsCombatShip(s.Type));
             int colls    = myShips.Count(s => s.Type == ShipType.ResourceCollector);
 
             int targetMiners = GameConstants.AiTargetMiners[Idx];
 
             // Phase 0: economy first — build miners until target reached
-            if (miners < targetMiners && Resources >= GameConstants.BuildCosts[(int)ShipType.Miner])
+            if (miners < targetMiners && Resources >= GameConstants.BuildCosts[(int)ShipType.Worker])
             {
-                QueueBuild(ShipType.Miner, allShips);
+                QueueBuild(ShipType.Worker, allShips);
                 return;
             }
 
@@ -133,17 +133,17 @@ namespace FleetCommand
 			// Easy: only light shipst + corvet
 			if (Level == AiLevel.Easy)
             {
-                var pool = new[] { ShipType.Interceptor, ShipType.Bomber, ShipType.Corvet };
+                var pool = new[] { ShipType.Interceptor, ShipType.Bomber, ShipType.Corvette };
                 return pool[rng.Next(pool.Length)];
             }
 
 
-			// Normal: light + corvet + occasional frigate
+			// Normal: light + Corvette + occasional frigate
 			if (Level == AiLevel.Normal)
             {
                 if (combatCount > 6 && rng.Next(3) == 0)
                     return ShipType.Frigate;
-                var pool = new[] { ShipType.Interceptor, ShipType.Bomber, ShipType.Corvet };
+                var pool = new[] { ShipType.Interceptor, ShipType.Bomber, ShipType.Corvette };
                 return pool[rng.Next(pool.Length)];
             }
 
@@ -155,7 +155,7 @@ namespace FleetCommand
 					return ShipType.Destroyer;
 				if (combatCount > 6 && rng.Next(2) == 0)
 					return ShipType.Frigate;
-				var pool = new[] { ShipType.Interceptor, ShipType.Bomber, ShipType.Corvet };
+				var pool = new[] { ShipType.Interceptor, ShipType.Bomber, ShipType.Corvette };
 				return pool[rng.Next(pool.Length)];
 			}
 
@@ -166,7 +166,7 @@ namespace FleetCommand
                 return ShipType.Destroyer;
             if (combatCount > 4  && Resources > 500  && rng.Next(2) == 0)
                 return ShipType.Frigate;
-            var light = new[] { ShipType.Interceptor, ShipType.Bomber, ShipType.Corvet };
+            var light = new[] { ShipType.Interceptor, ShipType.Bomber, ShipType.Corvette };
             return light[rng.Next(light.Length)];
         }
 
@@ -187,7 +187,7 @@ namespace FleetCommand
                 if (GameConstants.AiTargetsEconomy[Idx] && rng.Next(3) == 0)
                 {
                     var econTargets = playerShips
-                        .Where(p => p.Type == ShipType.Miner || p.Type == ShipType.ResourceCollector)
+                        .Where(p => p.Type == ShipType.Worker || p.Type == ShipType.ResourceCollector)
                         .ToList();
                     if (econTargets.Count > 0)
                     {
@@ -200,7 +200,7 @@ namespace FleetCommand
 
                 // Default: attack combat ships, fall back to mothership
                 var combatTargets = playerShips
-                    .Where(p => p.Type != ShipType.Miner && p.Type != ShipType.Mothership
+                    .Where(p => p.Type != ShipType.Worker && p.Type != ShipType.Mothership
                              && p.Type != ShipType.ResourceCollector)
                     .ToList();
 
@@ -227,7 +227,7 @@ namespace FleetCommand
             // Fleet cap: count live ships + queued spawns for this type on our team
             int cap        = GameConstants.FleetCaps[(int)type];
             int spawnCount = type == ShipType.Interceptor || type == ShipType.Bomber ? 5
-                           : type == ShipType.Corvet ? 3
+                           : type == ShipType.Corvette ? 3
                            : 1;
             int live       = allShips.Count(s => s.IsAlive && s.TeamId == Mothership.TeamId && s.Type == type);
             int queued     = Mothership.BuildQueue.Count(q => q.Type == type) * spawnCount;
@@ -249,7 +249,7 @@ namespace FleetCommand
         }
 
         private static bool IsCombatShip(ShipType t) =>
-            t == ShipType.Interceptor || t == ShipType.Bomber || t == ShipType.Corvet ||
+            t == ShipType.Interceptor || t == ShipType.Bomber || t == ShipType.Corvette ||
             t == ShipType.Frigate     || t == ShipType.Destroyer || t == ShipType.Battlecruiser;
 
         private static float Dist(PointF a, PointF b)

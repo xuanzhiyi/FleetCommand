@@ -4,7 +4,7 @@
 //   Mothership.cs         — Mothership
 //   Miner.cs              — Miner
 //   TriangleShip.cs       — TriangleShip (abstract) + Interceptor + Bomber
-//   Corvet.cs             — Corvet
+//   Corvette.cs             — Corvette
 //   Frigate.cs            — Frigate
 //   Destroyer.cs          — Destroyer
 //   Battlecruiser.cs      — Battlecruiser

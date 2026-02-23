@@ -148,4 +148,16 @@
   <data name="Carrier" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\Carrier.jpg;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="interceptor" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\interceptor.jpg;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="Frigate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Frigate.jpg;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="Worker" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Worker.jpg;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="corvette" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\corvette.jpg;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
 </root>

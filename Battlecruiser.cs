@@ -32,7 +32,7 @@ namespace FleetCommand
         {
             float sx    = (Position.X + offset.X) * zoom;
             float sy    = (Position.Y + offset.Y) * zoom;
-            float w     = 35 * zoom, h = 18 * zoom, skew = 12 * zoom;
+            float w     = 45 * zoom, h = 25 * zoom, skew = 10 * zoom;
             var   color = GetShipColor();
 
             // Polygon points — used for the outline overlay and the fallback shape
@@ -54,10 +54,10 @@ namespace FleetCommand
                 if (sprite != null)
                 {
                     // Sprite sized to the full polygon width (w + skew on each side)
-                    float sz   = (w + skew) * 1.9f;
+                    float sz   = (w + skew) * 1.5f;
                     var   dest = new Rectangle((int)(sx - sz * 0.5f),
-                                               (int)(sy - sz * 0.4f),
-                                               (int)sz, (int)(sz * 0.8f));
+                                               (int)(sy - h ),
+                                               (int)(sz*1.3f), (int)(h*2));
 
                     using (var ia = new System.Drawing.Imaging.ImageAttributes())
                     {

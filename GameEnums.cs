@@ -3,10 +3,10 @@ namespace FleetCommand
     public enum ShipType
     {
         Mothership,
-        Miner,
+        Worker,
         Interceptor,
         Bomber,
-        Corvet,
+		Corvette,
         Frigate,
         Destroyer,
         Battlecruiser,
@@ -67,7 +67,7 @@ namespace FleetCommand
             if (attacker == ShipType.Interceptor &&
                 target   == ShipType.Bomber)                                     return 1.75f;
 
-            if (attacker == ShipType.Corvet &&
+            if (attacker == ShipType.Corvette &&
                 (target == ShipType.Interceptor || target == ShipType.Bomber))  return 1.75f;
 
             if (attacker == ShipType.Bomber &&
@@ -77,7 +77,7 @@ namespace FleetCommand
             // Frigate fires flak/shrapnel — lethal against ALL fighter types
             if (attacker == ShipType.Frigate &&
                 (target == ShipType.Interceptor || target == ShipType.Bomber ||
-                 target == ShipType.Corvet))                                     return 1.75f;
+                 target == ShipType.Corvette))                                     return 1.75f;
 
             if (attacker == ShipType.Destroyer &&
                 target   == ShipType.Frigate)                                    return 1.75f;
