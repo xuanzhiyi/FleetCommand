@@ -5,7 +5,9 @@ namespace FleetCommand
 {
     /// <summary>
     /// Tracks research upgrade levels (0-3) for each ship type and manages
-    /// the active research queue. Upgrades boost hull (MaxHP), speed, and damage.
+    /// the active research order plus a pending queue of up to 2 items.
+    /// Upgrades boost hull (MaxHP), speed, and damage.
+    /// Resources for queued items are deducted immediately on enqueue.
     /// </summary>
     public class ResearchManager
     {
@@ -14,6 +16,11 @@ namespace FleetCommand
 
         // Currently researching (null = idle)
         public ResearchOrder ActiveOrder { get; private set; }
+
+        // Pending queue — resources are deducted on enqueue; max 2 items
+        private readonly List<ShipType> _queue = new List<ShipType>(2);
+        public IReadOnlyList<ShipType> ResearchQueue => _queue;
+        public int QueueCount => _queue.Count;
 
         private const float HullBonusPerLevel   = 0.20f;  // +20% hull per level
         private const float SpeedBonusPerLevel  = 0.12f;  // +12% speed per level (with friction)
@@ -71,7 +78,9 @@ namespace FleetCommand
         public bool IsResearching(ShipType type) =>
             ActiveOrder != null && ActiveOrder.Type == type;
 
-        // ── Start a research order ───────────────────────────────────────────────
+        public bool IsQueued(ShipType type) => _queue.Contains(type);
+
+        // ── Start a research order (lab must be idle) ────────────────────────────
 
         public bool TryStart(ShipType type, ref int playerResources, out string error)
         {
@@ -89,17 +98,77 @@ namespace FleetCommand
             return true;
         }
 
+        // ── Add to the research queue (max 2; resources charged immediately) ─────
+
+        public bool TryEnqueue(ShipType type, ref int playerResources, out string error)
+        {
+            error = null;
+            if (type == ShipType.Mothership || type == ShipType.ResourceCollector)
+                { error = $"{type} cannot be upgraded."; return false; }
+            if (!CanResearch(type))
+                { error = $"{type} is already at max upgrade (Mk.III)."; return false; }
+            if (ActiveOrder == null)
+                { error = "Research lab is idle — start a research directly."; return false; }
+            if (IsResearching(type))
+                { error = $"{type} is currently being researched."; return false; }
+            if (IsQueued(type))
+                { error = $"{type} is already in the research queue."; return false; }
+            if (_queue.Count >= 2)
+                { error = "Research queue is full (max 2 items)."; return false; }
+
+            int cost = CostFor(type);
+            if (playerResources < cost)
+                { error = $"Need {cost} resources (have {playerResources})."; return false; }
+
+            playerResources -= cost;
+            _queue.Add(type);
+            return true;
+        }
+
+        // ── Remove from queue and refund resources ────────────────────────────────
+
+        public bool TryDequeue(ShipType type, ref int playerResources)
+        {
+            int idx = _queue.IndexOf(type);
+            if (idx < 0) return false;
+
+            // Refund the cost that was charged when enqueuing
+            playerResources += CostFor(type);
+            _queue.RemoveAt(idx);
+            return true;
+        }
+
         // ── Tick (call every Update) ─────────────────────────────────────────────
 
         public ResearchOrder Tick(int deltaMs)
         {
-            if (ActiveOrder == null) return null;
+            if (ActiveOrder == null)
+            {
+                // Auto-pop the queue if something is waiting
+                if (_queue.Count > 0)
+                {
+                    var next = _queue[0];
+                    _queue.RemoveAt(0);
+                    ActiveOrder = new ResearchOrder(next, NextLevel(next), DurationFor(next));
+                }
+                return null;
+            }
+
             ActiveOrder.Elapsed += deltaMs;
             if (!ActiveOrder.IsComplete) return null;
 
             var completed = ActiveOrder;
             Levels[completed.Type] = completed.Level;
             ActiveOrder = null;
+
+            // Immediately start the next queued item (if any)
+            if (_queue.Count > 0)
+            {
+                var next = _queue[0];
+                _queue.RemoveAt(0);
+                ActiveOrder = new ResearchOrder(next, NextLevel(next), DurationFor(next));
+            }
+
             return completed;
         }
 

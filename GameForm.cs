@@ -66,10 +66,17 @@ namespace FleetCommand
         private Label researchActiveLabel;
         private ProgressBar researchActiveBar;
 
+        // Research queue UI
+        private Label researchQueueHeader;
+        private readonly Label[]  _queueSlotLabels     = new Label[2];
+        private readonly Button[] _queueSlotRemoveBtns = new Button[2];
+
         // Change tracking — avoid touching WinForms controls every tick
         private int _lastResources = -1;
         private bool _researchDirty = false;
         private int _lastResearchPct = -1;
+        private int _lastQueueCount = -1;
+        private ShipType _lastActiveResearchType = (ShipType)(-1);
 
         private Bitmap wp;
 
@@ -491,16 +498,126 @@ namespace FleetCommand
                 TabStop = false
             };
             p.Controls.Add(researchActiveBar);
+            y += 16;
+
+            // Research queue display (max 2 items)
+            researchQueueHeader = new Label
+            {
+                Text      = "── Queue (0/2) ──",
+                ForeColor = Color.DimGray,
+                Font      = new Font("Arial", 7),
+                AutoSize  = true,
+                Location  = new Point(0, y)
+            };
+            p.Controls.Add(researchQueueHeader);
+            y += 16;
+
+            for (int i = 0; i < 2; i++)
+            {
+                int slot = i;   // capture loop variable for lambda
+
+                _queueSlotLabels[i] = new Label
+                {
+                    Text      = $"{i + 1}. Empty",
+                    ForeColor = Color.FromArgb(55, 55, 55),
+                    Font      = new Font("Consolas", 8),
+                    AutoSize  = false,
+                    Size      = new Size(W - 36, 14),
+                    Location  = new Point(10, y)
+                };
+                p.Controls.Add(_queueSlotLabels[i]);
+
+                _queueSlotRemoveBtns[i] = new Button
+                {
+                    Text      = "×",
+                    Location  = new Point(W - 24, y - 1),
+                    Size      = new Size(20, 16),
+                    FlatStyle = FlatStyle.Flat,
+                    Font      = new Font("Consolas", 8, FontStyle.Bold),
+                    ForeColor = Color.IndianRed,
+                    BackColor = Color.FromArgb(30, 10, 10),
+                    Visible   = false,
+                    TabStop   = false,
+                };
+                _queueSlotRemoveBtns[i].FlatAppearance.BorderColor = Color.DarkRed;
+                _queueSlotRemoveBtns[i].FlatAppearance.BorderSize  = 1;
+                _queueSlotRemoveBtns[i].Click += (s, e) => OnQueueRemoveClicked(slot);
+                p.Controls.Add(_queueSlotRemoveBtns[i]);
+
+                y += 18;
+            }
         }
 
         private void OnResearchClicked(ShipType type)
         {
             string err;
-            if (!world.TryStartResearch(type, out err))
+            bool ok;
+
+            // If the lab is busy (and this type is not the active one), add to queue.
+            // Otherwise try to start research directly.
+            if (world.Research.ActiveOrder != null && !world.Research.IsResearching(type))
+                ok = world.TryEnqueueResearch(type, out err);
+            else
+                ok = world.TryStartResearch(type, out err);
+
+            if (!ok)
                 MessageBox.Show(err, "Cannot Research", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             else
+            {
+                _researchDirty = true;
                 RefreshResearchRows();
+                UpdateResearchQueueUI();
+            }
             this.Focus();
+        }
+
+        private void OnQueueRemoveClicked(int slotIndex)
+        {
+            var q = world.Research.ResearchQueue;
+            if (slotIndex >= q.Count) return;
+
+            var type = q[slotIndex];
+            string err;
+            world.TryDequeueResearch(type, out err);
+
+            _researchDirty = true;
+            RefreshResearchRows();
+            UpdateResearchQueueUI();
+            this.Focus();
+        }
+
+        private void UpdateResearchQueueUI()
+        {
+            if (researchQueueHeader == null) return;
+
+            var q = world.Research.ResearchQueue;
+            int count = q.Count;
+
+            researchQueueHeader.Text = $"── Queue ({count}/2) ──";
+
+            for (int i = 0; i < 2; i++)
+            {
+                if (_queueSlotLabels[i] == null) continue;
+
+                if (i < count)
+                {
+                    var type   = q[i];
+                    int nextLv = world.Research.NextLevel(type);
+                    int cost   = world.Research.CostFor(type);
+                    int sec    = world.Research.DurationFor(type) / 1000;
+                    string mk  = nextLv == 1 ? "Mk.I" : nextLv == 2 ? "Mk.II" : "Mk.III";
+
+                    _queueSlotLabels[i].Text      = $"{i + 1}. {type} →{mk}  {cost}r {sec}s";
+                    _queueSlotLabels[i].ForeColor  = Color.Orange;
+                    _queueSlotRemoveBtns[i].Visible = true;
+                }
+                else
+                {
+                    _queueSlotLabels[i].Text       = $"{i + 1}. Empty";
+                    _queueSlotLabels[i].ForeColor   = Color.FromArgb(55, 55, 55);
+                    _queueSlotRemoveBtns[i].Visible = false;
+                }
+            }
         }
 
         // ── Tab switching ──────────────────────────────────────────────────────
@@ -650,6 +767,15 @@ namespace FleetCommand
             // Research progress bar: cheap, update when pct changes
             UpdateResearchProgress();
 
+            // Research queue: refresh when count changes (e.g. item auto-popped on completion)
+            int currentQueueCount = world.Research.QueueCount;
+            if (currentQueueCount != _lastQueueCount)
+            {
+                _lastQueueCount = currentQueueCount;
+                UpdateResearchQueueUI();
+                _researchDirty = true;
+            }
+
             // Research rows: only when dirty AND tab is visible
             if (_researchDirty && researchTabPanel.Visible)
             {
@@ -693,13 +819,24 @@ namespace FleetCommand
                     researchActiveLabel.Text = $"{active.Type} → Mk.{active.Level}  ({sec}s left)";
                     researchActiveBar.Value = pct;
                 }
+
+                // Detect when the active order switches to a new type (queue auto-pop)
+                if (_lastActiveResearchType != active.Type)
+                {
+                    _lastActiveResearchType = active.Type;
+                    _researchDirty = true;
+                }
             }
-            else if (_lastResearchPct != 0)
+            else
             {
-                _lastResearchPct = 0;
-                researchActiveLabel.Text = "Idle — select a ship above";
-                researchActiveBar.Value = 0;
-                _researchDirty = true; // research just finished
+                if (_lastResearchPct != 0 || _lastActiveResearchType != (ShipType)(-1))
+                {
+                    _lastResearchPct = 0;
+                    _lastActiveResearchType = (ShipType)(-1);
+                    researchActiveLabel.Text = "Idle — select a ship above";
+                    researchActiveBar.Value = 0;
+                    _researchDirty = true; // research just finished
+                }
             }
         }
 
@@ -1353,10 +1490,12 @@ namespace FleetCommand
             {
                 var rm = world.Research;
                 int level = rm.Levels[type];
-                bool maxed = level >= 3;
-                bool busy = rm.ActiveOrder != null;
-                bool myTurn = rm.IsResearching(type);
-                bool canAfford = !maxed && !busy && world.PlayerResources >= rm.CostFor(type);
+                bool maxed    = level >= 3;
+                bool busy     = rm.ActiveOrder != null;
+                bool myTurn   = rm.IsResearching(type);
+                bool queued   = rm.IsQueued(type);
+                bool queueFull = rm.QueueCount >= 2;
+                bool canAfford = !maxed && world.PlayerResources >= rm.CostFor(type);
 
                 string lvStr = level == 0 ? "Base" : $"Mk.{level}";
                 levelLbl.Text = $"{type,-11}{lvStr}";
@@ -1383,11 +1522,35 @@ namespace FleetCommand
                     resBtn.ForeColor = Color.Plum; resBtn.BackColor = Color.FromArgb(25, 10, 35);
                     resBtn.FlatAppearance.BorderColor = Color.MediumPurple;
                 }
+                else if (queued)
+                {
+                    // This type is sitting in the pending queue
+                    resBtn.Text = "Queued"; resBtn.Enabled = false;
+                    resBtn.ForeColor = Color.Orange; resBtn.BackColor = Color.FromArgb(30, 20, 5);
+                    resBtn.FlatAppearance.BorderColor = Color.DarkOrange;
+                }
                 else if (busy)
                 {
-                    resBtn.Text = "Lab busy"; resBtn.Enabled = false;
-                    resBtn.ForeColor = Color.DimGray; resBtn.BackColor = Color.FromArgb(20, 20, 30);
-                    resBtn.FlatAppearance.BorderColor = Color.DimGray;
+                    // Lab is busy with something else — offer queue slot if available
+                    if (!queueFull && canAfford)
+                    {
+                        string nl = level == 0 ? "+Queue Mk.I" : level == 1 ? "+Queue Mk.II" : "+Queue Mk.III";
+                        resBtn.Text = nl; resBtn.Enabled = true;
+                        resBtn.ForeColor = Color.Yellow; resBtn.BackColor = Color.FromArgb(28, 24, 5);
+                        resBtn.FlatAppearance.BorderColor = Color.Goldenrod;
+                    }
+                    else if (!queueFull)
+                    {
+                        resBtn.Text = "Need res"; resBtn.Enabled = false;
+                        resBtn.ForeColor = Color.DimGray; resBtn.BackColor = Color.FromArgb(20, 20, 30);
+                        resBtn.FlatAppearance.BorderColor = Color.DimGray;
+                    }
+                    else
+                    {
+                        resBtn.Text = "Q.Full"; resBtn.Enabled = false;
+                        resBtn.ForeColor = Color.DimGray; resBtn.BackColor = Color.FromArgb(20, 20, 30);
+                        resBtn.FlatAppearance.BorderColor = Color.DimGray;
+                    }
                 }
                 else
                 {
