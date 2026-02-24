@@ -175,6 +175,10 @@ namespace FleetCommand
                     s => s.IsAlive && s.TeamId == 0 && s.Type == completed.Type);
                 LogEvent($"✦ Research complete! {completed.Type} → Mk.{completed.Level}" +
                          (retrofitCount > 0 ? $"  ({retrofitCount} ship{(retrofitCount > 1 ? "s" : "")} upgraded)" : ""));
+
+                // Log if a queued item auto-started immediately after completion
+                if (Research.ActiveOrder != null)
+                    LogEvent($"⚗ Researching {Research.ActiveOrder.Type} → Mk.{Research.ActiveOrder.Level}... (from queue)");
             }
 
             // ── Enemy AI controllers ──────────────────────────────────────────
@@ -453,6 +457,28 @@ namespace FleetCommand
             bool   ok        = Research.TryStart(type, ref resource, out error);
             PlayerResources  = resource;
             if (ok) LogEvent($"⚗ Researching {type} → {nextLabel}... Cost: {cost} res");
+            return ok;
+        }
+
+        public bool TryEnqueueResearch(ShipType type, out string error)
+        {
+            int    cost      = Research.CostFor(type);
+            string nextLabel = Research.NextLevelLabel(type);
+            int    resource  = PlayerResources;
+            bool   ok        = Research.TryEnqueue(type, ref resource, out error);
+            PlayerResources  = resource;
+            if (ok) LogEvent($"⚗ Queued {type} → {nextLabel}... Cost: {cost} res");
+            return ok;
+        }
+
+        public bool TryDequeueResearch(ShipType type, out string error)
+        {
+            error = null;
+            int resource = PlayerResources;
+            bool ok = Research.TryDequeue(type, ref resource);
+            PlayerResources = resource;
+            if (ok) LogEvent($"⚗ Removed {type} from research queue (refunded)");
+            else error = $"{type} is not in the research queue.";
             return ok;
         }
 
