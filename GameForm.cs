@@ -1306,9 +1306,21 @@ namespace FleetCommand
                     // ── Light fighters: expanding DELTA (triangle) formation ─────
                     if (lightFighters.Count > 0)
                     {
-                        float cx = 0f, cy = 0f;
-                        foreach (var f in lightFighters) { cx += f.Position.X; cy += f.Position.Y; }
-                        cx /= lightFighters.Count; cy /= lightFighters.Count;
+                        // Find the ship closest to destination as the formation anchor.
+                        // This prevents unnecessary regrouping - farther ships catch up to the closer one.
+                        float cx = 0f, cy = 0f, minDist = float.MaxValue;
+                        foreach (var f in lightFighters)
+                        {
+                            float dx = f.Position.X - worldPt.X;
+                            float dy = f.Position.Y - worldPt.Y;
+                            float dist = dx * dx + dy * dy;
+                            if (dist < minDist)
+                            {
+                                minDist = dist;
+                                cx = f.Position.X;
+                                cy = f.Position.Y;
+                            }
+                        }
 
 						float fdx = worldPt.X - cx, fdy = worldPt.Y - cy;
                         float fdist = (float)Math.Sqrt(fdx * fdx + fdy * fdy);
@@ -1351,9 +1363,21 @@ namespace FleetCommand
                     // ── Capitals: WALL formation (line abreast, ⊥ to travel) ──────
                     if (capitals.Count > 0)
                     {
-                        float cx = 0f, cy = 0f;
-                        foreach (var c in capitals) { cx += c.Position.X; cy += c.Position.Y; }
-                        cx /= capitals.Count; cy /= capitals.Count;
+                        // Find the ship closest to destination as the formation anchor.
+                        // This prevents unnecessary regrouping - farther ships catch up to the closer one.
+                        float cx = 0f, cy = 0f, minDist = float.MaxValue;
+                        foreach (var c in capitals)
+                        {
+                            float dx = c.Position.X - worldPt.X;
+                            float dy = c.Position.Y - worldPt.Y;
+                            float dist = dx * dx + dy * dy;
+                            if (dist < minDist)
+                            {
+                                minDist = dist;
+                                cx = c.Position.X;
+                                cy = c.Position.Y;
+                            }
+                        }
 
 						float fdx = worldPt.X - cx, fdy = worldPt.Y - cy;
                         float fdist = (float)Math.Sqrt(fdx * fdx + fdy * fdy);

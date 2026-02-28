@@ -60,10 +60,11 @@ namespace FleetCommand
         {
             if (!IsAlive) return;
 
-            // Update heading toward movement target (attack target or destination)
+            // Update heading toward movement target (attack target, formation waypoint, or destination)
+            // Must use same target as MoveTowardDestination() for proper alignment checking
             PointF? moveTarget = null;
             if (AttackTarget?.IsAlive == true) moveTarget = AttackTarget.Position;
-            else if (Destination.HasValue) moveTarget = Destination.Value;
+            else moveTarget = FormationWaypoint ?? Destination;
 
             if (moveTarget.HasValue)
             {
@@ -208,10 +209,31 @@ namespace FleetCommand
             }
             else
             {
-                // Move in the direction we're facing (determined by Heading), not directly toward target
-                Position = new PointF(
-                    Position.X + (float)Math.Cos(Heading) * Speed,
-                    Position.Y + (float)Math.Sin(Heading) * Speed);
+                // Sequential rotation-then-move design:
+                // 1. Calculate target heading
+                // 2. If heading is close to target, move forward
+                // 3. Otherwise, only rotate (don't move yet)
+                // This applies uniformly to both formation waypoints and final destinations.
+
+                float targetHeading = GetHeadingToward(target.Value);
+
+                // Calculate shortest heading difference
+                float headingDiff = targetHeading - Heading;
+                headingDiff = NormalizeAngle(headingDiff);
+                if (headingDiff > Math.PI) headingDiff -= (float)(2 * Math.PI);
+
+                // Small alignment tolerance: ~10° (π/18 ≈ 0.174 radians)
+                // This allows movement once ship is nearly aligned with destination
+                float alignmentTolerance = (float)(Math.PI / 18);
+
+                if (Math.Abs(headingDiff) < alignmentTolerance)
+                {
+                    // Heading is sufficiently aligned; move forward in the direction we're facing
+                    Position = new PointF(
+                        Position.X + (float)Math.Cos(Heading) * Speed,
+                        Position.Y + (float)Math.Sin(Heading) * Speed);
+                }
+                // Otherwise: just rotate, don't move yet (ship is still turning toward destination)
             }
         }
 

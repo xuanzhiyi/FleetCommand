@@ -43,7 +43,7 @@ namespace FleetCommand
         public static readonly float[] RotationSpeeds = {
             0.5f,   // Mothership: very slow (~29°/s)
             2.4f,   // Worker: medium (~86°/s)
-            2.7f,   // Interceptor: fast (~114°/s)
+            3.7f,   // Interceptor: fast (~114°/s)
             2.4f,   // Bomber: fast (~103°/s)
             1.8f,   // Corvette: fast (~92°/s)
             1.3f,   // Frigate: medium (~57°/s)
