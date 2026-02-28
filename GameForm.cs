@@ -112,12 +112,17 @@ namespace FleetCommand
             {
                 WaveStream mp3Reader;
 
-                string[] music = new string[] { "FleetCommand.Resources.bgmusic.mp3", "FleetCommand.Resources.bgmusic2.mp3" };
+                string[] music = new string[] { 
+                    "FleetCommand.Resources.bgmusic.mp3", 
+                    "FleetCommand.Resources.bgmusic2.mp3",
+                    "FleetCommand.Resources.bgmusic3.mp3",
+					"FleetCommand.Resources.bgmusic4.mp3",
+					"FleetCommand.Resources.bgmusic5.mp3" };
                 Random rand = new Random();
 
 
                 var stream = Assembly.GetExecutingAssembly()
-                    .GetManifestResourceStream(music[rand.Next(0,2)]);
+                    .GetManifestResourceStream(music[rand.Next(0,5)]);
                 //if (stream != null) { musicPlayer = new SoundPlayer(stream); musicPlayer.PlayLooping(); }
                 if (stream != null)
                 {
@@ -344,9 +349,9 @@ namespace FleetCommand
 
 
 
-            Bitmap[] wpList = new Bitmap[] { Resources.wallpaper, Resources.wallpaper2, Resources.wallpaper3 };
+            Bitmap[] wpList = new Bitmap[] { Resources.wallpaper, Resources.wallpaper2, Resources.wallpaper3, Resources.wallpaper4, Resources.wallpaper5, Resources.wallpaper6 };
             Random rand = new Random();
-            wp = wpList[rand.Next(0, 3)];
+            wp = wpList[rand.Next(0, 6)];
         }
 
         // ── Build tab content ──────────────────────────────────────────────────
@@ -1033,8 +1038,8 @@ namespace FleetCommand
             _boundaryY1 = cameraOffset.Y * zoom;
             _boundaryX2 = (cameraOffset.X + GameConstants.MapWidth) * zoom;
             _boundaryY2 = (cameraOffset.Y + GameConstants.MapHeight) * zoom;
-            using (var pen = new Pen(Color.FromArgb(40, Color.DarkGray), 2))
-                g.DrawRectangle(pen, _boundaryX1, _boundaryY1, _boundaryX2 - _boundaryX1, _boundaryY2 - _boundaryY1);
+            //using (var pen = new Pen(Color.FromArgb(40, Color.DarkGray), 2))
+            //    g.DrawRectangle(pen, _boundaryX1, _boundaryY1, _boundaryX2 - _boundaryX1, _boundaryY2 - _boundaryY1);
         }
 
         private void DrawStatusBar(Graphics g)

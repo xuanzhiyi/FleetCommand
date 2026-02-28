@@ -160,4 +160,13 @@
   <data name="corvette" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\corvette.jpg;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="wallpaper5" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\wallpaper5.jpg;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="wallpaper6" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\wallpaper6.jpg;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="wallpaper4" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\wallpaper4.jpeg;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
 </root>
