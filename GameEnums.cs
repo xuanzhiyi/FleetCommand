@@ -146,6 +146,7 @@ namespace FleetCommand
         public static readonly int[]  AiBuildTickMs           = { 12000, 8000, 5000, 3000 };
         public static readonly int[]  AiWaveIntervalMs        = { 90000, 60000, 40000, 25000 };
         public static readonly int[]  AiMinFleetToAttack      = { 4,  3,  2,  1 };
+        public static readonly int[]  AiTargetProbes          = { 2,  3,  4,  5 };  // Probes per difficulty: Easy, Normal, Hard, Expert
         public static readonly int[]  AiCombatBuildThreshold  = { 600, 400, 300, 200 };
         public static readonly bool[] AiUsesCollectors        = { false, false, true, true };
         public static readonly bool[] AiTargetsEconomy        = { false, false, true, true };

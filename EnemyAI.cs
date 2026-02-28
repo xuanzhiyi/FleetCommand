@@ -111,19 +111,23 @@ namespace FleetCommand
                 return;
             }
 
+            // Maintain scout probe fleet (like miners for exploration)
+            // Probes are high-priority for reconnaissance
+            int probes = myShips.Count(s => s.Type == ShipType.Probe);
+            int targetProbes = GameConstants.AiTargetProbes[Idx];
+
+            // Build probes to target count (even before collectors and combat)
+            if (probes < targetProbes && miners >= 1 && Resources >= GameConstants.BuildCosts[(int)ShipType.Probe])
+            {
+                QueueBuild(ShipType.Probe, allShips);
+                return;  // Prioritize probe building for reconnaissance
+            }
+
             // Build a collector if AI uses them and doesn't have enough
             if (GameConstants.AiUsesCollectors[Idx] && colls < 1 + miners / 5
                 && Resources >= GameConstants.BuildCosts[(int)ShipType.ResourceCollector])
             {
                 QueueBuild(ShipType.ResourceCollector, allShips);
-                return;
-            }
-
-            // Build early scouts (probes) for reconnaissance
-            int probes = myShips.Count(s => s.Type == ShipType.Probe);
-            if (probes < 2 && miners >= 2 && Resources >= GameConstants.BuildCosts[(int)ShipType.Probe])
-            {
-                QueueBuild(ShipType.Probe, allShips);
                 return;
             }
 

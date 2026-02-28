@@ -48,7 +48,7 @@ namespace FleetCommand
         /// Override destination setter to track movement count.
         /// Each time a new destination is set, increment movement counter.
         /// </summary>
-        public new PointF? Destination
+        public override PointF? Destination
         {
             get => base.Destination;
             set

@@ -9,7 +9,7 @@ namespace FleetCommand
     {
         public ShipType  Type          { get; protected set; }
         public PointF    Position      { get; set; }
-        public PointF?   Destination       { get; set; }
+        public virtual PointF?   Destination       { get; set; }
         public PointF?   FormationWaypoint { get; set; }
         public float     HP            { get; set; }
         public float     MaxHPValue    { get; set; }
