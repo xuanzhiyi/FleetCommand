@@ -186,13 +186,22 @@ namespace FleetCommand
         {
             if (!playerMothership.IsAlive) return;
 
+            var playerShips = allShips.Where(s => s.IsAlive && s.IsPlayerOwned).ToList();
+            var visibleCombatShips = playerShips.Where(s => s.Type != ShipType.Mothership).ToList();
+
+            // ── Scout probes independently ──────────────────────────────────────
+            // Send probes to explore whenever no player combat ships are visible
+            var myProbes = allShips.Where(s => s.IsAlive && OwnedBy(s) && s.Type == ShipType.Probe).ToList();
+            if (myProbes.Count > 0 && visibleCombatShips.Count == 0)
+            {
+                SendScoutMission(myProbes, playerMothership.Position);
+            }
+
+            // ── Combat fleet waves ─────────────────────────────────────────────
             var myFleet = allShips.Where(s => s.IsAlive && OwnedBy(s) && IsCombatShip(s.Type)).ToList();
             if (myFleet.Count < GameConstants.AiMinFleetToAttack[Idx]) return;
 
-            var playerShips = allShips.Where(s => s.IsAlive && s.IsPlayerOwned).ToList();
-
-            // If no visible player ships except mothership, send scouts to explore
-            var visibleCombatShips = playerShips.Where(s => s.Type != ShipType.Mothership).ToList();
+            // If no visible player ships except mothership, send combat ships to explore
             if (visibleCombatShips.Count == 0)
             {
                 SendScoutMission(myFleet, playerMothership.Position);
@@ -241,21 +250,42 @@ namespace FleetCommand
         // Send scout ships to search for the player
         private void SendScoutMission(List<Ship> myFleet, PointF playerMothershipPos)
         {
-            // Send different fighters to explore different areas
-            // Divide the fleet into search groups exploring toward player territory (left side of map)
+            // Probes use their large vision radius efficiently with mid-map sweeping
+            // Combat fighters explore edge areas where player likely is
+            bool isProbeFleet = myFleet.Count > 0 && myFleet[0].Type == ShipType.Probe;
 
             for (int i = 0; i < myFleet.Count; i++)
             {
                 var ship = myFleet[i];
+                float searchX, searchY;
 
-                // Create waypoints across the left side of the map (where player likely is)
-                // X range: 0 to MapWidth/3, Y range: full map height
-                float searchX = (i % 3) * (GameConstants.MapWidth / 3);
-                float searchY = (float)GameConstants.MapHeight * ((i / 3) % 3) / 3;
+                if (isProbeFleet)
+                {
+                    // Probes: position in mid-map grid for efficient radar coverage (600 unit range)
+                    // Create sweep pattern across map using probe vision radius
+                    // X positions: 1500, 3000, 4500 (1500 apart, centered)
+                    // Y positions: 1000, 2000, 3000 (distributed vertically)
+                    int[] probeXPositions = { 1500, 3000, 4500 };
+                    int[] probeYPositions = { 1000, 2000, 3000 };
 
-                // Add some randomness to search pattern
-                searchX += rng.Next(-200, 200);
-                searchY += rng.Next(-200, 200);
+                    searchX = probeXPositions[i % probeXPositions.Length];
+                    searchY = probeYPositions[(i / probeXPositions.Length) % probeYPositions.Length];
+
+                    // Small randomness to prevent exact overlap
+                    searchX += rng.Next(-100, 100);
+                    searchY += rng.Next(-100, 100);
+                }
+                else
+                {
+                    // Combat ships: explore edge areas toward player territory (left side of map)
+                    // X range: 0 to MapWidth/3, Y range: full map height
+                    searchX = (i % 3) * (GameConstants.MapWidth / 3);
+                    searchY = (float)GameConstants.MapHeight * ((i / 3) % 3) / 3;
+
+                    // Add randomness to search pattern
+                    searchX += rng.Next(-200, 200);
+                    searchY += rng.Next(-200, 200);
+                }
 
                 // Clamp to map bounds
                 searchX = Math.Max(0, Math.Min(GameConstants.MapWidth, searchX));
