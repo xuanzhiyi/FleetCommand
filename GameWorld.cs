@@ -23,6 +23,16 @@ namespace FleetCommand
         private readonly Random rng = new Random();
         private int repairLogTimer;
 
+        // Visibility tracking: which ships are visible to each team
+        // visibleShips[teamId] = set of Ship objects visible to that team (recalculated each frame)
+        private Dictionary<int, HashSet<Ship>> _visibleShips = new Dictionary<int, HashSet<Ship>>()
+        {
+            { 0, new HashSet<Ship>() },  // Team 0 (player) visible ships
+            { 1, new HashSet<Ship>() },  // Team 1 (enemy) visible ships
+            { 2, new HashSet<Ship>() },
+            { 3, new HashSet<Ship>() }
+        };
+
         public GameWorld(List<AiLevel> enemyLevels)
         {
             PlayerResources = GameConstants.StartingResources;
@@ -163,6 +173,9 @@ namespace FleetCommand
         {
             if (State != GameState.Playing) return;
 
+            // ── Calculate visibility (before anything else) ────────────────────
+            UpdateVisibility();
+
             // ── Ship physics & miner AI ───────────────────────────────────────
             foreach (var ship in Ships.Where(s => s.IsAlive).ToList())
             {
@@ -224,7 +237,22 @@ namespace FleetCommand
 
             // ── Enemy AI controllers ──────────────────────────────────────────
             foreach (var e in Enemies)
-                if (e.IsAlive) e.Update(deltaMs, Ships, Asteroids, PlayerMothership);
+            {
+                if (!e.IsAlive) continue;
+
+                // Determine which team this enemy controls
+                int enemyTeamId = e.Mothership != null ? e.Mothership.TeamId : 1;
+
+                // Pass only visible ships to enemy AI (fog of war)
+                // AI can see: its own ships + visible enemy ships + player mothership (always detectable)
+                var visibleShips = Ships.Where(s => s.IsAlive &&
+                    (s.TeamId == enemyTeamId ||
+                     IsShipVisible(s, enemyTeamId) ||
+                     s == PlayerMothership))  // Mothership always visible to enemy AI
+                    .ToList();
+
+                e.Update(deltaMs, visibleShips, Asteroids, PlayerMothership);
+            }
 
             // ── Combat ────────────────────────────────────────────────────────
             ResolveCombat();
@@ -342,6 +370,15 @@ namespace FleetCommand
             var playerShips = Ships.Where(s => s.IsAlive && s.TeamId == 0).ToList();
             var allEnemyShips = Ships.Where(s => s.IsAlive && s.TeamId != 0).ToList();
 
+            // Clear targets that are no longer visible
+            foreach (var ship in playerShips.Concat(allEnemyShips))
+            {
+                if (ship.AttackTarget != null && !IsShipVisible(ship.AttackTarget, ship.TeamId))
+                {
+                    ship.AttackTarget = null;  // Can't see target anymore
+                }
+            }
+
             // Player ships fire at enemies
             foreach (var ps in playerShips)
             {
@@ -366,7 +403,8 @@ namespace FleetCommand
                     }
                     continue;
                 }
-                foreach (var es in allEnemyShips)
+                // Only attack visible enemy ships
+                foreach (var es in allEnemyShips.Where(s => IsShipVisible(s, 0)))
                 {
                     if (Dist(ps.Position, es.Position) <= range)
                     {
@@ -396,7 +434,8 @@ namespace FleetCommand
                     }
                     continue;
                 }
-                foreach (var ps in playerShips)
+                // Only attack visible player ships
+                foreach (var ps in playerShips.Where(s => IsShipVisible(s, es.TeamId)))
                 {
                     if (ps.Type == ShipType.Worker || ps.Type == ShipType.ResourceCollector) continue;
                     if (Dist(es.Position, ps.Position) <= range)
@@ -680,6 +719,60 @@ namespace FleetCommand
             float dx = a.X - b.X, dy = a.Y - b.Y;
             return (float)Math.Sqrt(dx * dx + dy * dy);
         }
+
+        /// <summary>
+        /// Calculate which ships each team can see based on vision radius.
+        /// Called once per frame at start of GameWorld.Update().
+        /// Ships always see their own team's ships; enemy ships visible only if within radar.
+        /// </summary>
+        private void UpdateVisibility()
+        {
+            // Clear previous visibility state
+            foreach (var set in _visibleShips.Values)
+                set.Clear();
+
+            // For each ship, determine what it can see
+            foreach (var observerShip in Ships.Where(s => s.IsAlive))
+            {
+                int observerTeam = observerShip.TeamId;
+                float visionRadius = GameConstants.VisionRadius[(int)observerShip.Type];
+
+                // Every ship sees all ships on its own team
+                foreach (var allyShip in Ships.Where(s => s.IsAlive && s.TeamId == observerTeam))
+                {
+                    _visibleShips[observerTeam].Add(allyShip);
+                }
+
+                // Check what enemy ships are within vision radius
+                foreach (var potentialTarget in Ships.Where(s => s.IsAlive && s.TeamId != observerTeam))
+                {
+                    float dx = potentialTarget.Position.X - observerShip.Position.X;
+                    float dy = potentialTarget.Position.Y - observerShip.Position.Y;
+                    float distSquared = dx * dx + dy * dy;
+                    float radiusSquared = visionRadius * visionRadius;
+
+                    if (distSquared <= radiusSquared)
+                    {
+                        // Enemy ship is within vision radius
+                        _visibleShips[observerTeam].Add(potentialTarget);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Check if a ship is visible to a specific team.
+        /// </summary>
+        public bool IsShipVisible(Ship ship, int teamId)
+        {
+            if (ship == null || !ship.IsAlive) return false;
+            return _visibleShips[teamId].Contains(ship);
+        }
+
+        /// <summary>
+        /// Get the set of visible ships for a team.
+        /// </summary>
+        public HashSet<Ship> GetVisibleShips(int teamId) => _visibleShips[teamId];
 
         public void LogEvent(string msg)
         {

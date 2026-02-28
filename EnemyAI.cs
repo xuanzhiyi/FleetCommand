@@ -119,6 +119,14 @@ namespace FleetCommand
                 return;
             }
 
+            // Build early scouts (probes) for reconnaissance
+            int probes = myShips.Count(s => s.Type == ShipType.Probe);
+            if (probes < 2 && miners >= 2 && Resources >= GameConstants.BuildCosts[(int)ShipType.Probe])
+            {
+                QueueBuild(ShipType.Probe, allShips);
+                return;
+            }
+
             // Phase 1+: build combat ships once economy is running and resources allow
             if (miners >= 2 && Resources >= GameConstants.AiCombatBuildThreshold[Idx])
             {
@@ -149,7 +157,7 @@ namespace FleetCommand
 
 
 			// Hard: mixed fleet, occasional frigate
-			if (Level == AiLevel.Easy)
+			if (Level == AiLevel.Hard)
 			{
 				if (combatCount > 8 && Resources > 800 && rng.Next(3) == 0)
 					return ShipType.Destroyer;
@@ -178,6 +186,14 @@ namespace FleetCommand
             if (myFleet.Count < GameConstants.AiMinFleetToAttack[Idx]) return;
 
             var playerShips = allShips.Where(s => s.IsAlive && s.IsPlayerOwned).ToList();
+
+            // If no visible player ships except mothership, send scouts to explore
+            var visibleCombatShips = playerShips.Where(s => s.Type != ShipType.Mothership).ToList();
+            if (visibleCombatShips.Count == 0)
+            {
+                SendScoutMission(myFleet, playerMothership.Position);
+                return;
+            }
 
             foreach (var ship in myFleet)
             {
@@ -216,6 +232,34 @@ namespace FleetCommand
             string label = Level == AiLevel.Easy   ? "Easy AI" :
                            Level == AiLevel.Normal  ? "Normal AI" :
                            Level == AiLevel.Hard    ? "Hard AI" : "Expert AI";
+        }
+
+        // Send scout ships to search for the player
+        private void SendScoutMission(List<Ship> myFleet, PointF playerMothershipPos)
+        {
+            // Send different fighters to explore different areas
+            // Divide the fleet into search groups exploring toward player territory (left side of map)
+
+            for (int i = 0; i < myFleet.Count; i++)
+            {
+                var ship = myFleet[i];
+
+                // Create waypoints across the left side of the map (where player likely is)
+                // X range: 0 to MapWidth/3, Y range: full map height
+                float searchX = (i % 3) * (GameConstants.MapWidth / 3);
+                float searchY = (float)GameConstants.MapHeight * ((i / 3) % 3) / 3;
+
+                // Add some randomness to search pattern
+                searchX += rng.Next(-200, 200);
+                searchY += rng.Next(-200, 200);
+
+                // Clamp to map bounds
+                searchX = Math.Max(0, Math.Min(GameConstants.MapWidth, searchX));
+                searchY = Math.Max(0, Math.Min(GameConstants.MapHeight, searchY));
+
+                ship.Destination = new PointF(searchX, searchY);
+                ship.AttackTarget = null;
+            }
         }
 
         private void QueueBuild(ShipType type, List<Ship> allShips)

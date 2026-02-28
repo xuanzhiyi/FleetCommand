@@ -11,7 +11,8 @@ namespace FleetCommand
         Destroyer,
         Battlecruiser,
         ResourceCollector,
-        Carrier
+        Carrier,
+        Probe
     }
 
     // AI strategy level — affects decision-making, NOT stat multipliers
@@ -22,19 +23,19 @@ namespace FleetCommand
     public static class GameConstants
     {
         public static readonly int[] BuildCosts = {
-            0, 50, 150, 200, 300, 500, 800, 1500, 400, 2000
+            0, 50, 150, 200, 300, 500, 800, 1500, 400, 2000, 30
         };
         public static readonly int[] BuildTimes = {
-            0, 5000, 6000, 10000, 12000, 15000, 30000, 45000, 12000, 45000
+            0, 5000, 6000, 10000, 12000, 15000, 30000, 45000, 12000, 45000, 3000
         };
         public static readonly int[] MaxHP = {
-            12000, 100, 200, 220, 180, 500, 3000, 10000, 600, 5000
+            12000, 100, 200, 220, 180, 500, 3000, 10000, 600, 5000, 100
         };
         public static readonly float[] Damage = {
-            1.0f, 0, 0.3f, 0.5f, 0.3f, 0.7f, 1.2f, 2.5f, 0, 0.4f
+            1.0f, 0, 0.3f, 0.5f, 0.3f, 0.7f, 1.2f, 2.5f, 0, 0.4f, 0
         };
         public static readonly float[] Speeds = {
-            0.5f, 1.5f, 3.5f, 2.5f, 2.4f, 1.8f, 1.2f, 1.0f, 1.2f, 1.0f
+            0.5f, 1.5f, 3.5f, 2.5f, 2.4f, 1.8f, 1.2f, 1.0f, 1.2f, 1.0f, 6.0f
         };
 
         // Ship rotation speeds (radians per second)
@@ -50,7 +51,27 @@ namespace FleetCommand
             0.9f,   // Destroyer: medium-slow (~52°/s)
             0.75f,  // Battlecruiser: slow (~43°/s)
             1.4f,   // ResourceCollector: medium (~80°/s)
-            0.7f    // Carrier: slow (~40°/s)
+            0.7f,   // Carrier: slow (~40°/s)
+            3.0f    // Probe: very fast (scout, ~172°/s)
+        };
+
+        // Vision radius for each ship type (world units)
+        // Capitals see farther, fighters see less, support varies
+        // Indexed by ShipType: Mothership, Worker, Interceptor, Bomber, Corvette,
+        //                      Frigate, Destroyer, Battlecruiser, ResourceCollector, Carrier
+        public static readonly float[] VisionRadius = {
+            600f,   // Mothership: widest vision (command ship)
+            250f,   // Worker: smallest vision (miners have limited awareness)
+            400f,   // Interceptor: fighter medium vision
+            400f,   // Bomber: fighter medium vision
+            350f,   // Corvette: fighter medium vision
+            500f,   // Frigate: good vision
+            550f,   // Destroyer: very good vision
+            600f,   // Battlecruiser: excellent vision (capital)
+            300f,   // ResourceCollector: limited vision (support)
+            575f,   // Carrier: excellent vision (capital)
+            600f    //
+                    // : excellent vision for scouting
         };
 
         public const int MiningRate         = 10;
@@ -69,7 +90,7 @@ namespace FleetCommand
         // Indexed by ShipType: Mothership, Miner, Interceptor, Bomber, Corvet,
         //                      Frigate, Destroyer, Battlecruiser, ResourceCollector, Carrier
         public static readonly int[] FleetCaps = {
-            1, 20, 50, 40, 30, 20, 8, 5, 4, 3
+            1, 20, 50, 40, 30, 20, 8, 5, 4, 3, 20
         };
 
         // ── Combat multipliers (strong / weak against) ────────────────────────
@@ -124,7 +145,7 @@ namespace FleetCommand
         public static readonly int[]  AiBuildQueueMax         = { 2,  3,  4,  5 };
         public static readonly int[]  AiBuildTickMs           = { 12000, 8000, 5000, 3000 };
         public static readonly int[]  AiWaveIntervalMs        = { 90000, 60000, 40000, 25000 };
-        public static readonly int[]  AiMinFleetToAttack      = { 8,  5,  4,  3 };
+        public static readonly int[]  AiMinFleetToAttack      = { 4,  3,  2,  1 };
         public static readonly int[]  AiCombatBuildThreshold  = { 600, 400, 300, 200 };
         public static readonly bool[] AiUsesCollectors        = { false, false, true, true };
         public static readonly bool[] AiTargetsEconomy        = { false, false, true, true };

@@ -260,7 +260,7 @@ namespace FleetCommand
             buildTabPanel = new Panel
             {
                 Location = P(4, y),
-                Size = new Size(W, 300),
+                Size = new Size(W, 326),
                 BackColor = Color.Transparent,
                 Visible = true,
             };
@@ -271,14 +271,14 @@ namespace FleetCommand
             researchTabPanel = new Panel
             {
                 Location = P(4, y),
-                Size = new Size(W, 300),
+                Size = new Size(W, 326),
                 BackColor = Color.Transparent,
                 Visible = false,
             };
             BuildResearchTab(researchTabPanel, W);
             SP(researchTabPanel);
 
-            y += 304;
+            y += 324;
 
             // Controls help
             SP(Sep("── CONTROLS ──", y)); y += 18;
@@ -368,15 +368,17 @@ namespace FleetCommand
             (ShipType.Battlecruiser,      false),
             (ShipType.ResourceCollector,  false),
             (ShipType.Carrier,            false),
+            (ShipType.Probe,              false),
         };
 
-        // Carriers can only build fighters and workers
+        // Carriers can only build fighters, workers, and probes
         private static readonly (ShipType Type, bool Squad)[] CarrierBuildable =
         {
             (ShipType.Interceptor, true),
             (ShipType.Bomber,      true),
             (ShipType.Corvette,      false),
             (ShipType.Worker,       false),
+            (ShipType.Probe,       false),
         };
 
         private Button MakeBuildButton(ShipType type, bool squad, int y, int w)
@@ -856,6 +858,44 @@ namespace FleetCommand
                     using (var br = new SolidBrush(col))
                         g.FillRectangle(br, px, py, 2, 2);
                 }
+
+                // Draw only outer radar boundary circles (not inner circles)
+                // A circle is "outer" if it's not completely contained within another ship's radar
+                var playerShips = world.Ships.Where(s => s.IsAlive && s.TeamId == 0).ToList();
+
+                foreach (var ship in playerShips)
+                {
+                    float visionRadius = GameConstants.VisionRadius[(int)ship.Type];
+
+                    // Check if this circle is completely contained within another ship's radar
+                    bool isContained = playerShips.Any(other =>
+                    {
+                        if (other == ship) return false;
+
+                        float otherVisionRadius = GameConstants.VisionRadius[(int)other.Type];
+
+                        // Calculate distance between ships in world units
+                        float dx = ship.Position.X - other.Position.X;
+                        float dy = ship.Position.Y - other.Position.Y;
+                        float distanceWorld = (float)Math.Sqrt(dx * dx + dy * dy);
+
+                        // Ship circle is contained if: distance + its radius <= other's radius
+                        return (distanceWorld + visionRadius) <= otherVisionRadius;
+                    });
+
+                    // Only draw circles that form the outer boundary
+                    if (!isContained)
+                    {
+                        float radarPixelsX = (visionRadius / GameConstants.MapWidth) * MiniMapW;
+                        float radarPixelsY = (visionRadius / GameConstants.MapHeight) * MiniMapH;
+                        float centerPx = (ship.Position.X / GameConstants.MapWidth) * MiniMapW;
+                        float centerPy = (ship.Position.Y / GameConstants.MapHeight) * MiniMapH;
+
+                        using (var pen = new Pen(Color.Cyan, 1f))
+                            g.DrawEllipse(pen, centerPx - radarPixelsX, centerPy - radarPixelsY,
+                                               radarPixelsX * 2, radarPixelsY * 2);
+                    }
+                }
             }
 
             var old = _miniMapBox.Image;
@@ -947,8 +987,17 @@ namespace FleetCommand
             DrawMapBorder(g);
 
             foreach (var ast in world.Asteroids) ast.Draw(g, cameraOffset, zoom);
-            foreach (var ship in world.Ships.Where(s => s.IsAlive)) ship.Draw(g, cameraOffset, zoom);
+
+            // Render ships: show player's own ships and visible enemy ships (within radar range)
+            foreach (var ship in world.Ships.Where(s => s.IsAlive))
+            {
+                if (ship.IsPlayerOwned || world.IsShipVisible(ship, 0))
+                    ship.Draw(g, cameraOffset, zoom);
+            }
             foreach (var fx in world.CombatEffects) fx.Draw(g, cameraOffset, zoom);
+
+            // Fog of war: unexplored areas are simply not rendered (stay as black background)
+            // No overlay needed - visibility filtering already hides invisible ships
 
             // Attack-order lines
             foreach (var ship in selectedShips.Where(s => s.IsAlive && s.AttackTarget?.IsAlive == true))
@@ -1040,6 +1089,68 @@ namespace FleetCommand
             _boundaryY2 = (cameraOffset.Y + GameConstants.MapHeight) * zoom;
             //using (var pen = new Pen(Color.FromArgb(40, Color.DarkGray), 2))
             //    g.DrawRectangle(pen, _boundaryX1, _boundaryY1, _boundaryX2 - _boundaryX1, _boundaryY2 - _boundaryY1);
+        }
+
+        private void DrawFogOfWarMask(Graphics g, PointF cameraOffset, float zoom)
+        {
+            // Draw semi-transparent dark overlay ONLY over unexplored areas (OPTIMIZED)
+            // Much faster: create overlay bitmap once, draw as single image
+            int pw = sidePanel?.Width ?? 440;
+            int w = ClientSize.Width - pw, h = ClientSize.Height;
+
+            // Create overlay bitmap with semi-transparent dark color
+            using (var overlayBmp = new Bitmap(w, h))
+            {
+                // Lock bitmap for fast direct pixel access
+                var bmpData = overlayBmp.LockBits(
+                    new Rectangle(0, 0, w, h),
+                    System.Drawing.Imaging.ImageLockMode.WriteOnly,
+                    System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+                unsafe
+                {
+                    byte* ptr = (byte*)bmpData.Scan0;
+                    int stride = bmpData.Stride;
+
+                    // Initialize entire bitmap to semi-transparent dark (unexplored)
+                    for (int y = 0; y < h; y++)
+                    {
+                        for (int x = 0; x < w; x++)
+                        {
+                            int idx = y * stride + x * 4;
+                            ptr[idx] = 0;        // Blue
+                            ptr[idx + 1] = 0;    // Green
+                            ptr[idx + 2] = 0;    // Red
+                            ptr[idx + 3] = 128;  // Alpha (50% transparent)
+                        }
+                    }
+                }
+
+                // Clear circles for visible radar areas (make transparent)
+                using (var overlayG = Graphics.FromImage(overlayBmp))
+                {
+                    var visibleShips = world.GetVisibleShips(0);
+                    foreach (var ship in visibleShips)
+                    {
+                        float visionRadius = GameConstants.VisionRadius[(int)ship.Type];
+                        float screenX = (ship.Position.X + cameraOffset.X) * zoom;
+                        float screenY = (ship.Position.Y + cameraOffset.Y) * zoom;
+                        float radiusPixels = visionRadius * zoom;
+
+                        // Draw fully transparent circle (removes overlay from visible areas)
+                        using (var transparentBrush = new SolidBrush(Color.FromArgb(0, 0, 0, 0)))
+                        {
+                            overlayG.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
+                            overlayG.FillEllipse(transparentBrush,
+                                screenX - radiusPixels, screenY - radiusPixels,
+                                radiusPixels * 2, radiusPixels * 2);
+                        }
+                    }
+                }
+
+                // Draw entire overlay bitmap at once (much faster than pixel-by-pixel)
+                g.DrawImageUnscaled(overlayBmp, 0, 0);
+            }
         }
 
         private void DrawStatusBar(Graphics g)

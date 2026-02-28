@@ -38,6 +38,7 @@ namespace FleetCommand
                 case ShipType.Battlecruiser:      return new Battlecruiser(position, isPlayer);
                 case ShipType.ResourceCollector:  return new ResourceCollector(position, isPlayer);
                 case ShipType.Carrier:            return new Carrier(position, isPlayer);
+                case ShipType.Probe:              return new Probe(position, isPlayer);
                 default:                          return new Miner(position, isPlayer);
             }
         }
