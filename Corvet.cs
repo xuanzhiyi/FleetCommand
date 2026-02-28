@@ -41,21 +41,41 @@ namespace FleetCommand
 				var sprite = GetSprite();
 				if (sprite != null)
 				{
-					// Sized slightly wider than the full parallelogram span
-					// (w + skew on each side), with a landscape aspect ratio.
-					var dest = new Rectangle((int)(sx - s),
-											   (int)(sy - s),
-											   (int)(s * 2f), (int)(s * 2f));
+					// Create color matrix for team tinting
+					// Simple multiplication: preserves black for SetColorKey to work
+					var teamColor = GetShipColor();
+					float r = teamColor.R / 255f;
+					float g_val = teamColor.G / 255f;
+					float b = teamColor.B / 255f;
+
+
+					// Save graphics state for transformation
+					var graphicsState = g.Save();
+
+					// Translate to sprite center for rotation
+					g.TranslateTransform(sx, sy);
+
+					// Rotate by heading (convert radians to degrees)
+					float degreesRotation = (float)(Heading * 180 / Math.PI);
+					g.RotateTransform(degreesRotation);
+
+					// Translate back to sprite position
+					g.TranslateTransform(-s, -s);
+
+					var dest = new Rectangle(0, 0, (int)(s * 2f), (int)(s * 2f));
 
 					using (var ia = new System.Drawing.Imaging.ImageAttributes())
 					{
-						// Key out near-black background (0,0,0) → (20,20,20)
+						// Key out near-black background (0,0,0) → (20, 20, 20) to handle JPEG artifacts
 						ia.SetColorKey(Color.FromArgb(0, 0, 0),
 									   Color.FromArgb(20, 20, 20));
 						g.DrawImage(sprite, dest,
 									0, 0, sprite.Width, sprite.Height,
 									GraphicsUnit.Pixel, ia);
 					}
+
+					// Restore graphics state
+					g.Restore(graphicsState);
 				}
 				int ringAlpha = IsSelected ? 220 : 90;
 				using (var pen = new Pen(Color.FromArgb(ringAlpha, GetShipColor()),

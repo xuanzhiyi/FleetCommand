@@ -37,6 +37,22 @@ namespace FleetCommand
             0.5f, 1.5f, 3.5f, 2.5f, 3.0f, 1.8f, 1.3f, 1.0f, 1.2f, 1.0f
         };
 
+        // Ship rotation speeds (radians per second)
+        // Indexed by ShipType: Mothership, Worker, Interceptor, Bomber, Corvette,
+        //                      Frigate, Destroyer, Battlecruiser, ResourceCollector, Carrier
+        public static readonly float[] RotationSpeeds = {
+            0.5f,   // Mothership: very slow (~29°/s)
+            2.4f,   // Worker: medium (~86°/s)
+            2.7f,   // Interceptor: fast (~114°/s)
+            2.4f,   // Bomber: fast (~103°/s)
+            1.8f,   // Corvette: fast (~92°/s)
+            1.3f,   // Frigate: medium (~57°/s)
+            0.9f,   // Destroyer: medium-slow (~52°/s)
+            0.75f,  // Battlecruiser: slow (~43°/s)
+            1.4f,   // ResourceCollector: medium (~80°/s)
+            0.7f    // Carrier: slow (~40°/s)
+        };
+
         public const int MiningRate         = 10;
         public const int AsteroidMinResource = 1500;
         public const int AsteroidMaxResource = 20000;

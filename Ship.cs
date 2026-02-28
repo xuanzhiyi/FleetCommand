@@ -41,6 +41,9 @@ namespace FleetCommand
         // Team ownership: 0 = player, 1/2/3 = enemy AI index
         public int TeamId { get; set; } = 0;
 
+        // Rotation/Heading — in radians, 0° = right (east), π/2 = down (south)
+        public float Heading { get; set; } = 0f;
+
         protected Ship(ShipType type, PointF position, bool isPlayer)
         {
             Type          = type;
@@ -56,6 +59,17 @@ namespace FleetCommand
         public virtual void Update(List<Ship> allShips, List<Asteroid> asteroids, Ship playerMothership)
         {
             if (!IsAlive) return;
+
+            // Update heading toward movement target (attack target or destination)
+            PointF? moveTarget = null;
+            if (AttackTarget?.IsAlive == true) moveTarget = AttackTarget.Position;
+            else if (Destination.HasValue) moveTarget = Destination.Value;
+
+            if (moveTarget.HasValue)
+            {
+                float targetHeading = GetHeadingToward(moveTarget.Value);
+                Heading = RotateToward(Heading, targetHeading, GetRotationSpeed(), DeltaMs);
+            }
 
             if (AttackTarget != null)
             {
@@ -127,6 +141,56 @@ namespace FleetCommand
             }
         }
 
+        // ── Heading/Rotation helpers ───────────────────────────────────────
+
+        // Calculate angle (in radians) from current position to target position
+        // 0° = right (east), π/2 = down (south), π = left (west), 3π/2 = up (north)
+        protected float GetHeadingToward(PointF target)
+        {
+            float dx = target.X - Position.X;
+            float dy = target.Y - Position.Y;
+            return (float)Math.Atan2(dy, dx);
+        }
+
+        // Normalize angle to [0, 2π) range
+        protected float NormalizeAngle(float angle)
+        {
+            while (angle < 0) angle += (float)(2 * Math.PI);
+            while (angle >= 2 * Math.PI) angle -= (float)(2 * Math.PI);
+            return angle;
+        }
+
+        // Smoothly rotate from current heading toward target heading
+        // Returns new heading after this frame's rotation
+        protected float RotateToward(float currentHeading, float targetHeading, float rotationSpeed, float deltaMs)
+        {
+            // Normalize both angles to [0, 2π)
+            currentHeading = NormalizeAngle(currentHeading);
+            targetHeading = NormalizeAngle(targetHeading);
+
+            // Calculate shortest path between angles
+            float diff = NormalizeAngle(targetHeading - currentHeading);
+
+            // If we're over halfway around, go the other way
+            if (diff > Math.PI) diff -= (float)(2 * Math.PI);
+
+            // Maximum rotation this frame (radians)
+            float maxRotation = rotationSpeed * (deltaMs / 1000f);
+
+            // Apply limited rotation
+            if (Math.Abs(diff) <= maxRotation)
+                return targetHeading;  // Reached target heading
+
+            // Rotate in the appropriate direction
+            return NormalizeAngle(currentHeading + (diff > 0 ? maxRotation : -maxRotation));
+        }
+
+        // Get rotation speed (radians per second) for this ship type
+        protected virtual float GetRotationSpeed()
+        {
+            return GameConstants.RotationSpeeds[(int)Type];
+        }
+
         protected void MoveTowardDestination()
         {
             PointF? target = FormationWaypoint ?? Destination;
@@ -144,7 +208,10 @@ namespace FleetCommand
             }
             else
             {
-                Position = new PointF(Position.X + dx / dist * Speed, Position.Y + dy / dist * Speed);
+                // Move in the direction we're facing (determined by Heading), not directly toward target
+                Position = new PointF(
+                    Position.X + (float)Math.Cos(Heading) * Speed,
+                    Position.Y + (float)Math.Sin(Heading) * Speed);
             }
         }
 

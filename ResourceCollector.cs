@@ -28,6 +28,13 @@ namespace FleetCommand
         {
             if (!IsAlive) return;
 
+            // Update heading toward movement target
+            if (Destination.HasValue)
+            {
+                float targetHeading = GetHeadingToward(Destination.Value);
+                Heading = RotateToward(Heading, targetHeading, GetRotationSpeed(), DeltaMs);
+            }
+
             MoveTowardDestination();
         }
 
