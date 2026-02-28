@@ -34,7 +34,7 @@ namespace FleetCommand
             1.0f, 0, 0.3f, 0.5f, 0.3f, 0.7f, 1.2f, 2.5f, 0, 0.4f
         };
         public static readonly float[] Speeds = {
-            0.5f, 1.5f, 3.5f, 2.5f, 3.0f, 1.8f, 1.3f, 1.0f, 1.2f, 1.0f
+            0.5f, 1.5f, 3.5f, 2.5f, 2.4f, 1.8f, 1.2f, 1.0f, 1.2f, 1.0f
         };
 
         // Ship rotation speeds (radians per second)
