@@ -32,9 +32,18 @@ namespace FleetCommand
         private void InitializeMap(List<AiLevel> enemyLevels)
         {
             // ── Player ────────────────────────────────────────────────────────
-            PlayerMothership = new Mothership(new PointF(400, GameConstants.MapHeight / 2f), true);
+
+            // Pick a random spawn on the left third of the map, tracked for min-distance checks.
+            var spawnedPositions = new List<PointF>();
+            PointF playerPos = RandomSpawnPos(
+                200, (int)(GameConstants.MapWidth * 0.3f),
+                200, (int)(GameConstants.MapHeight - 200),
+                spawnedPositions);
+
+            PlayerMothership = new Mothership(playerPos, true);
             PlayerMothership.TeamId = 0;
             Ships.Add(PlayerMothership);
+            spawnedPositions.Add(playerPos);
 
             // Starting miners for player
             for (int i = 0; i < GameConstants.StartingMiners; i++)
@@ -45,18 +54,18 @@ namespace FleetCommand
                 Ships.Add(m);
             }
 
-            //debug
-   //         var carrier = new Carrier(new PointF(450, GameConstants.MapHeight / 2f-100), true);
-   //         carrier.TeamId = 0;
-   //         Ships.Add(carrier);
+			//debug
+			//         var carrier = new Carrier(new PointF(450, GameConstants.MapHeight / 2f-100), true);
+			//         carrier.TeamId = 0;
+			//         Ships.Add(carrier);
 
-   //         var battle = new Battlecruiser(new PointF(500, GameConstants.MapHeight / 2f + 100), true);
-   //         battle.TeamId = 0;
-   //         Ships.Add(battle);
+			//         var battle = new Battlecruiser(new PointF(500, GameConstants.MapHeight / 2f + 100), true);
+			//         battle.TeamId = 0;
+			//         Ships.Add(battle);
 
-   //         var fighter = new Interceptor(new PointF(600, GameConstants.MapHeight / 2f + 200), true);
-   //         fighter.TeamId = 0;
-   //         Ships.Add(fighter);
+			//         var fighter = new Interceptor(new PointF(600, GameConstants.MapHeight / 2f + 200), true);
+			//         fighter.TeamId = 0;
+			//         Ships.Add(fighter);
 
 			//var destroyer = new Destroyer(new PointF(600, GameConstants.MapHeight / 2f + 100), true);
 			//destroyer.TeamId = 0;
@@ -67,19 +76,28 @@ namespace FleetCommand
 			//Ships.Add(frigate);
 
 			// ── Enemy AIs ─────────────────────────────────────────────────────
-			// Place motherships evenly on the right half of the map
 			int count  = enemyLevels.Count;
-            float startY = GameConstants.MapHeight * 0.2f;
-            float stepY  = GameConstants.MapHeight * 0.6f / Math.Max(1, count - 1);
-            if (count == 1) startY = GameConstants.MapHeight / 2f;
 
             for (int i = 0; i < count; i++)
             {
-                float x  = GameConstants.MapWidth - 400;
-                float y  = count == 1 ? startY : startY + stepY * i;
+                // Enemies spawn on the right third of the map, spread across vertical space.
+                float baseY   = count == 1
+                    ? GameConstants.MapHeight / 2f
+                    : GameConstants.MapHeight * 0.1f + GameConstants.MapHeight * 0.8f * i / (count - 1);
+                float jitterY = (float)(rng.NextDouble() * 2 - 1) * GameConstants.MapHeight * 0.15f;
+                int   yMin    = (int)Math.Max(200, baseY + jitterY - 100);
+                int   yMax    = (int)Math.Min(GameConstants.MapHeight - 200, baseY + jitterY + 100);
+                if (yMin >= yMax) yMax = yMin + 1;
+
+                PointF enemyPos = RandomSpawnPos(
+                    (int)(GameConstants.MapWidth * 0.7f), (int)(GameConstants.MapWidth - 200),
+                    yMin, yMax,
+                    spawnedPositions);
+                spawnedPositions.Add(enemyPos);
+
                 int   tid = i + 1;
 
-                var ms = new Mothership(new PointF(x, y), false);
+                var ms = new Mothership(enemyPos, false);
                 ms.TeamId = tid;
                 Ships.Add(ms);
 
@@ -98,8 +116,31 @@ namespace FleetCommand
                 LogEvent($"Enemy {i + 1}: {enemyLevels[i]} AI");
             }
 
-            // ── Asteroids ─────────────────────────────────────────────────────
-            int asteroidCount = 40 + rng.Next(20);
+			// ── Asteroids ─────────────────────────────────────────────────────
+
+            // Starter asteroids — a cluster near each mothership for early-game economy.
+            var allMotherships = new List<PointF> { PlayerMothership.Position };
+            foreach (var e in Enemies) allMotherships.Add(e.Mothership.Position);
+
+            foreach (var msPos in allMotherships)
+            {
+                for (int k = 0; k < 3; k++)
+                {
+                    double angle  = rng.NextDouble() * 2 * Math.PI;
+                    float  radius = 180f + (float)(rng.NextDouble() * 170f);  // 180–350 wu
+                    var rawPos = new PointF(
+                        msPos.X + (float)Math.Cos(angle) * radius,
+                        msPos.Y + (float)Math.Sin(angle) * radius);
+                    // Clamp to map bounds [0, MapWidth] × [0, MapHeight]
+                    var pos = new PointF(
+                        Math.Max(0f, Math.Min(GameConstants.MapWidth, rawPos.X)),
+                        Math.Max(0f, Math.Min(GameConstants.MapHeight, rawPos.Y)));
+                    Asteroids.Add(new Asteroid(pos));
+                }
+            }
+
+            // Random asteroids across the rest of the map.
+            int asteroidCount = 24 + rng.Next(12);
             for (int i = 0; i < asteroidCount; i++)
             {
                 var pos = new PointF(
@@ -617,6 +658,21 @@ namespace FleetCommand
             }
             target.IsTargeted = true;
             LogEvent($"{attackers.Count} ship(s) ordered to attack {target.Type}!");
+        }
+
+        private PointF RandomSpawnPos(int xMin, int xMax, int yMin, int yMax,
+                                       List<PointF> existing, float minSep = 600f)
+        {
+            for (int attempt = 0; attempt < 10; attempt++)
+            {
+                var candidate = new PointF(rng.Next(xMin, xMax), rng.Next(yMin, yMax));
+                bool ok = true;
+                foreach (var p in existing)
+                    if (Dist(candidate, p) < minSep) { ok = false; break; }
+                if (ok) return candidate;
+            }
+            // Fallback: centre of the zone
+            return new PointF((xMin + xMax) / 2f, (yMin + yMax) / 2f);
         }
 
         private float Dist(PointF a, PointF b)

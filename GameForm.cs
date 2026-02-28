@@ -19,7 +19,7 @@ namespace FleetCommand
         // Camera
         private PointF cameraOffset = PointF.Empty;
         private float zoom = 1.0f;
-        private const float ZoomMin = 0.2f;
+        private const float ZoomMin = 0.5f;
         private const float ZoomMax = 3.0f;
         private const float ZoomStep = 0.1f;
         private const float ScrollSpeed = 15f;
@@ -44,6 +44,9 @@ namespace FleetCommand
         private Label resourceLabel;
         private Label diffLabel;
         private ListBox eventLog;
+        private Label _eventLogSep;
+        private PictureBox _miniMapBox;
+        private const int MiniMapW = 330, MiniMapH = 220; // ≈ 6000:4000 world ratio
         private Label buildQueueLabel;
         private ProgressBar buildProgress;
         private Label buildProgressLabel;
@@ -78,13 +81,18 @@ namespace FleetCommand
         private int _lastQueueCount = -1;
         private ShipType _lastActiveResearchType = (ShipType)(-1);
 
-        private Bitmap wp;
+        private float _boundaryX1, _boundaryX2, _boundaryY1, _boundaryY2;
+        private int sidePanelWidth = 440;
+
+		private Bitmap wp;
 
         private IWavePlayer outputDevice;
 
-        // ── Constructor ────────────────────────────────────────────────────────
+        private Boolean _IsDebug = false;
 
-        public GameForm(GameWorld world)
+		// ── Constructor ────────────────────────────────────────────────────────
+
+		public GameForm(GameWorld world)
         {
             this.world = world;
             InitializeUI();
@@ -287,8 +295,23 @@ namespace FleetCommand
                 Location = P(8, y)
             }); y += 84;
 
-            // Event log
-            SP(Sep("── EVENT LOG ──", y)); y += 18;
+
+			// MiniMap
+			SP(Sep("── MINI MAP ──", y)); y += 18;
+            _miniMapBox = new PictureBox
+            {
+                Location  = P((W - MiniMapW) / 2, y),
+                Size      = new Size(MiniMapW, MiniMapH),
+                BackColor = Color.Black,
+                BorderStyle = BorderStyle.FixedSingle,
+            };
+            _miniMapBox.MouseClick += OnMiniMapClick;
+            SP(_miniMapBox);
+            y += MiniMapH + 6;
+
+			// Event log (debug only — toggle with F12)
+			_eventLogSep = Sep("── EVENT LOG ──", y);
+            SP(_eventLogSep); y += 18;
             eventLog = new ListBox
             {
                 Location = P(4, y),
@@ -301,6 +324,8 @@ namespace FleetCommand
                 TabStop = false,
             };
             SP(eventLog);
+            _eventLogSep.Visible = _IsDebug;
+            eventLog.Visible     = _IsDebug;
 
             SwitchTab(true); // start on Build tab
 
@@ -679,10 +704,10 @@ namespace FleetCommand
 
             if (world.State == GameState.Playing)
             {
-                if (scrollLeft) cameraOffset = new PointF(cameraOffset.X + ScrollSpeed / zoom, cameraOffset.Y);
-                if (scrollRight) cameraOffset = new PointF(cameraOffset.X - ScrollSpeed / zoom, cameraOffset.Y);
-                if (scrollUp) cameraOffset = new PointF(cameraOffset.X, cameraOffset.Y + ScrollSpeed / zoom);
-                if (scrollDown) cameraOffset = new PointF(cameraOffset.X, cameraOffset.Y - ScrollSpeed / zoom);
+                if (scrollLeft) cameraOffset = ClampCameraOffset(new PointF(cameraOffset.X + ScrollSpeed / zoom, cameraOffset.Y));
+                if (scrollRight) cameraOffset = ClampCameraOffset(new PointF(cameraOffset.X - ScrollSpeed / zoom, cameraOffset.Y));
+                if (scrollUp) cameraOffset = ClampCameraOffset(new PointF(cameraOffset.X, cameraOffset.Y + ScrollSpeed / zoom));
+                if (scrollDown) cameraOffset = ClampCameraOffset(new PointF(cameraOffset.X, cameraOffset.Y - ScrollSpeed / zoom));
 
                 world.Update(delta);
                 UpdateUI();
@@ -791,6 +816,66 @@ namespace FleetCommand
                 foreach (var ev in world.EventLog.Take(30)) eventLog.Items.Add(ev);
                 eventLog.EndUpdate();
             }
+
+            RenderMiniMap();
+        }
+
+        private void RenderMiniMap()
+        {
+            if (_miniMapBox == null) return;
+
+            var bmp = new Bitmap(MiniMapW, MiniMapH);
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.Black);
+
+                // Team colours: 0 = player (blue), 1+ = enemies (orange-red tints)
+                Color[] teamColors =
+                {
+                    Color.CornflowerBlue,
+                    Color.OrangeRed,
+                    Color.HotPink,
+                    Color.Gold,
+                };
+
+                foreach (var ship in world.Ships)
+                {
+                    if (!ship.IsAlive) continue;
+                    int px = (int)(ship.Position.X / GameConstants.MapWidth  * MiniMapW);
+                    int py = (int)(ship.Position.Y / GameConstants.MapHeight * MiniMapH);
+                    px = Math.Max(0, Math.Min(MiniMapW - 2, px));
+                    py = Math.Max(0, Math.Min(MiniMapH - 2, py));
+
+                    int   teamIdx = Math.Min(ship.TeamId, teamColors.Length - 1);
+                    Color col     = teamColors[teamIdx];
+                    using (var br = new SolidBrush(col))
+                        g.FillRectangle(br, px, py, 2, 2);
+                }
+            }
+
+            var old = _miniMapBox.Image;
+            _miniMapBox.Image = bmp;
+            old?.Dispose();
+        }
+
+        private void OnMiniMapClick(object sender, MouseEventArgs e)
+        {
+            // Convert pixel coordinates on mini-map to world coordinates
+            float worldX = (e.X / (float)MiniMapW) * GameConstants.MapWidth;
+            float worldY = (e.Y / (float)MiniMapH) * GameConstants.MapHeight;
+
+            // Clamp clicked position to map bounds
+            worldX = Math.Max(0f, Math.Min(GameConstants.MapWidth, worldX));
+            worldY = Math.Max(0f, Math.Min(GameConstants.MapHeight, worldY));
+
+            // Calculate desired camera offset to center viewport on clicked location
+            float viewportWidth  = ClientSize.Width - sidePanelWidth;
+            float viewportHeight = ClientSize.Height;
+            float offsetX = (viewportWidth / 2f / zoom) - worldX;
+            float offsetY = (viewportHeight / 2f / zoom) - worldY;
+
+            // Clamp camera offset to map boundaries
+            cameraOffset = ClampCameraOffset(new PointF(offsetX, offsetY));
         }
 
         private void UpdateBuildAffordability()
@@ -941,13 +1026,15 @@ namespace FleetCommand
             }
         }
 
+
         private void DrawMapBorder(Graphics g)
         {
-            float x1 = cameraOffset.X * zoom, y1 = cameraOffset.Y * zoom;
-            float x2 = (cameraOffset.X + GameConstants.MapWidth) * zoom;
-            float y2 = (cameraOffset.Y + GameConstants.MapHeight) * zoom;
-            using (var pen = new Pen(Color.FromArgb(40, Color.Cyan), 2))
-                g.DrawRectangle(pen, x1, y1, x2 - x1, y2 - y1);
+            _boundaryX1 = cameraOffset.X * zoom;
+            _boundaryY1 = cameraOffset.Y * zoom;
+            _boundaryX2 = (cameraOffset.X + GameConstants.MapWidth) * zoom;
+            _boundaryY2 = (cameraOffset.Y + GameConstants.MapHeight) * zoom;
+            using (var pen = new Pen(Color.FromArgb(40, Color.DarkGray), 2))
+                g.DrawRectangle(pen, _boundaryX1, _boundaryY1, _boundaryX2 - _boundaryX1, _boundaryY2 - _boundaryY1);
         }
 
         private void DrawStatusBar(Graphics g)
@@ -1050,6 +1137,11 @@ namespace FleetCommand
                         selectedShips = world.Ships.Where(s => s.IsPlayerOwned && s.IsAlive && s.Type != ShipType.Mothership).ToList();
                         foreach (var s in world.Ships) s.IsSelected = selectedShips.Contains(s);
                     }
+                    break;
+                case Keys.F12:
+                    _IsDebug = !_IsDebug;
+                    _eventLogSep.Visible = _IsDebug;
+                    eventLog.Visible     = _IsDebug;
                     break;
             }
         }
@@ -1173,9 +1265,9 @@ namespace FleetCommand
                     }
 
                     // ── Categorise selected ships into three formation groups ──────
-                    var workers       = new List<Ship>();
+                    var workers = new List<Ship>();
                     var lightFighters = new List<Ship>();
-                    var capitals      = new List<Ship>();
+                    var capitals = new List<Ship>();
 
                     foreach (var s in selectedShips)
                     {
@@ -1200,8 +1292,8 @@ namespace FleetCommand
                     int wCnt = workers.Count;
                     for (int i = 0; i < wCnt; i++)
                     {
-                        workers[i].AttackTarget       = null;
-                        workers[i].FormationWaypoint  = null;
+                        workers[i].AttackTarget = null;
+                        workers[i].FormationWaypoint = null;
                         float spread = Math.Min(wCnt * 5f, 20f);
                         double angle = i * Math.PI * 2 / Math.Max(wCnt, 1);
                         workers[i].Destination = new PointF(
@@ -1218,9 +1310,9 @@ namespace FleetCommand
                         foreach (var f in lightFighters) { cx += f.Position.X; cy += f.Position.Y; }
                         cx /= lightFighters.Count; cy /= lightFighters.Count;
 
-                        float fdx = worldPt.X - cx, fdy = worldPt.Y - cy;
+						float fdx = worldPt.X - cx, fdy = worldPt.Y - cy;
                         float fdist = (float)Math.Sqrt(fdx * fdx + fdy * fdy);
-                        PointF fwd   = fdist < 1f
+                        PointF fwd = fdist < 1f
                             ? new PointF(1f, 0f)
                             : new PointF(fdx / fdist, fdy / fdist);
                         PointF right = new PointF(fwd.Y, -fwd.X);   // 90° clockwise
@@ -1228,14 +1320,14 @@ namespace FleetCommand
                         // Row 0 = 1-ship tip, row 1 = 2 ships, row 2 = 3 ships, …
                         // Partial last rows are spread to the full row width so the
                         // triangle silhouette is preserved for any ship count.
-                        const float rowSpacing =15f;
+                        const float rowSpacing = 15f;
                         const float colSpacing = 15f;
 
                         int n = lightFighters.Count, idx = 0;
                         for (int row = 0; idx < n; row++)
                         {
-                            int   shipsInRow = Math.Min(row + 1, n - idx);
-                            float rear       = row * rowSpacing;
+                            int shipsInRow = Math.Min(row + 1, n - idx);
+                            float rear = row * rowSpacing;
 
                             for (int i = 0; i < shipsInRow; i++, idx++)
                             {
@@ -1243,13 +1335,13 @@ namespace FleetCommand
                                     ? 0f
                                     : (-row / 2.0f + (float)i * row / (shipsInRow - 1)) * colSpacing;
 
-                                lightFighters[idx].AttackTarget      = null;
-                                lightFighters[idx].FormationWaypoint = new PointF(
-                                    cx        + lat * right.X - rear * fwd.X,
-                                    cy        + lat * right.Y - rear * fwd.Y);
-                                lightFighters[idx].Destination       = new PointF(
+                                lightFighters[idx].AttackTarget = null;
+                                lightFighters[idx].FormationWaypoint = ClampToMap(new PointF(
+                                    cx + lat * right.X - rear * fwd.X,
+                                    cy + lat * right.Y - rear * fwd.Y));
+                                lightFighters[idx].Destination = ClampToMap(new PointF(
                                     worldPt.X + lat * right.X - rear * fwd.X,
-                                    worldPt.Y + lat * right.Y - rear * fwd.Y);
+                                    worldPt.Y + lat * right.Y - rear * fwd.Y));
                                 lightFighters[idx].IsMining = false;
                                 lightFighters[idx].ReturningToMothership = false;
                             }
@@ -1263,9 +1355,9 @@ namespace FleetCommand
                         foreach (var c in capitals) { cx += c.Position.X; cy += c.Position.Y; }
                         cx /= capitals.Count; cy /= capitals.Count;
 
-                        float fdx = worldPt.X - cx, fdy = worldPt.Y - cy;
+						float fdx = worldPt.X - cx, fdy = worldPt.Y - cy;
                         float fdist = (float)Math.Sqrt(fdx * fdx + fdy * fdy);
-                        PointF fwd   = fdist < 1f
+                        PointF fwd = fdist < 1f
                             ? new PointF(1f, 0f)
                             : new PointF(fdx / fdist, fdy / fdist);
                         PointF right = new PointF(fwd.Y, -fwd.X);   // 90° clockwise
@@ -1278,13 +1370,13 @@ namespace FleetCommand
                         for (int i = 0; i < n; i++)
                         {
                             float wallOff = (i - (n - 1) / 2.0f) * wallSpacing;
-                            capitals[i].AttackTarget      = null;
-                            capitals[i].FormationWaypoint = new PointF(
-                                cx        + wallOff * right.X,
-                                cy        + wallOff * right.Y);
-                            capitals[i].Destination       = new PointF(
+                            capitals[i].AttackTarget = null;
+                            capitals[i].FormationWaypoint = ClampToMap(new PointF(
+                                cx + wallOff * right.X,
+                                cy + wallOff * right.Y));
+                            capitals[i].Destination = ClampToMap(new PointF(
                                 worldPt.X + wallOff * right.X,
-                                worldPt.Y + wallOff * right.Y);
+                                worldPt.Y + wallOff * right.Y));
                             capitals[i].IsMining = false;
                             capitals[i].ReturningToMothership = false;
                         }
@@ -1293,9 +1385,10 @@ namespace FleetCommand
             }
         }
 
-        private void OnMouseMove(object sender, MouseEventArgs e)
+		private void OnMouseMove(object sender, MouseEventArgs e)
         {
-            if (dragStart.HasValue && e.Button == MouseButtons.Left)
+
+			if (dragStart.HasValue && e.Button == MouseButtons.Left)
             {
                 float x = Math.Min(dragStart.Value.X, e.X), y = Math.Min(dragStart.Value.Y, e.Y);
                 float w = Math.Abs(e.X - dragStart.Value.X), h = Math.Abs(e.Y - dragStart.Value.Y);
@@ -1308,7 +1401,7 @@ namespace FleetCommand
             {
                 if (!isPanning) { isPanning = true; Cursor = Cursors.SizeAll; }
                 float dx = (e.X - panLastPos.X) / zoom, dy = (e.Y - panLastPos.Y) / zoom;
-                cameraOffset = new PointF(cameraOffset.X + dx, cameraOffset.Y + dy);
+                cameraOffset = ClampCameraOffset(new PointF(cameraOffset.X + dx, cameraOffset.Y + dy));
                 panLastPos = e.Location;
             }
 
@@ -1385,6 +1478,27 @@ namespace FleetCommand
 
         private void SP(Control c) => sidePanel.Controls.Add(c);
         private static Point P(int x, int y) => new Point(x, y);
+
+        private static PointF ClampToMap(PointF pt) => new PointF(
+            Math.Max(0f, Math.Min(GameConstants.MapWidth,  pt.X)),
+            Math.Max(0f, Math.Min(GameConstants.MapHeight, pt.Y)));
+
+        private PointF ClampCameraOffset(PointF offset)
+        {
+            float viewportWidth = ClientSize.Width - sidePanelWidth;
+            float viewportHeight = ClientSize.Height;
+
+            // Valid camera offset range: [viewportWidth/zoom - MapWidth, 0]
+            // This ensures viewport only shows world space [0, MapWidth] × [0, MapHeight]
+            float minOffsetX = viewportWidth / zoom - GameConstants.MapWidth;
+            float maxOffsetX = 0f;
+            float minOffsetY = viewportHeight / zoom - GameConstants.MapHeight;
+            float maxOffsetY = 0f;
+
+            return new PointF(
+                Math.Max(minOffsetX, Math.Min(maxOffsetX, offset.X)),
+                Math.Max(minOffsetY, Math.Min(maxOffsetY, offset.Y)));
+        }
 
         private Label Sep(string t, int y) => new Label
         {

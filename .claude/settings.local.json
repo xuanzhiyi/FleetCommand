@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(del \"C:\\\\Users\\\\xuanz\\\\source\\\\repos\\\\FleetCommand\\\\FleetCommand\\\\Ships.cs\")"
+      "Bash(del \"C:\\\\Users\\\\xuanz\\\\source\\\\repos\\\\FleetCommand\\\\FleetCommand\\\\Ships.cs\")",
+      "Bash(dotnet build FleetCommand.csproj -c Debug)"
     ]
   }
 }
