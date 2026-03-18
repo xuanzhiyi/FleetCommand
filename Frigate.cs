@@ -25,6 +25,7 @@ namespace FleetCommand
 		}
 
 		public Frigate(PointF position, bool isPlayer) : base(ShipType.Frigate, position, isPlayer) { Label = "Frigate"; }
+        public override float HyperspaceRadius { get; } = 20f;
 
         public override void Draw(Graphics g, PointF offset, float zoom)
         {

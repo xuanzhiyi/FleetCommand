@@ -44,6 +44,15 @@ namespace FleetCommand
         // Rotation/Heading — in radians, 0° = right (east), π/2 = down (south)
         public float Heading { get; set; } = 0f;
 
+        // Hyperspace jump state
+        public bool    IsHyperspaceJumping  { get; set; } = false;
+        public bool    HyperspaceDeparting  { get; set; } = true;
+        public float   HyperspaceProgress   { get; set; } = 0f;
+        public PointF? HyperspaceDestination { get; set; }
+        public Ship    HyperspaceCaptain    { get; set; }
+        public List<Ship> HyperspacePassengers { get; } = new List<Ship>();
+        public virtual float HyperspaceRadius { get; } = 28f;
+
         protected Ship(ShipType type, PointF position, bool isPlayer)
         {
             Type          = type;

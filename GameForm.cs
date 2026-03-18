@@ -39,6 +39,10 @@ namespace FleetCommand
         private bool isPanning;
         private Point panLastPos;
 
+        // Hyperspace targeting mode
+        private bool  _hyperspaceMode    = false;
+        private Point _hyperspaceMouseSc = Point.Empty;
+
         // ── Side panel refs ────────────────────────────────────────────────────
         private Panel sidePanel;
         private Label resourceLabel;
@@ -334,6 +338,7 @@ namespace FleetCommand
 
             SwitchTab(true); // start on Build tab
 
+            KeyPreview = true;  // form receives key events even when child controls have focus
             KeyDown += OnKeyDown;
             KeyUp += OnKeyUp;
             MouseDown += OnMouseDown;
@@ -991,7 +996,10 @@ namespace FleetCommand
             // Render ships: show player's own ships and visible enemy ships (within radar range)
             foreach (var ship in world.Ships.Where(s => s.IsAlive))
             {
-                if (ship.IsPlayerOwned || world.IsShipVisible(ship, 0))
+                if (!ship.IsPlayerOwned && !world.IsShipVisible(ship, 0)) continue;
+                if (ship.IsHyperspaceJumping)
+                    DrawHyperspaceShip(g, ship, cameraOffset, zoom);
+                else
                     ship.Draw(g, cameraOffset, zoom);
             }
             foreach (var fx in world.CombatEffects) fx.Draw(g, cameraOffset, zoom);
@@ -1037,6 +1045,34 @@ namespace FleetCommand
                 {
                     g.FillRectangle(brush, dragRect);
                     g.DrawRectangle(pen, dragRect.X, dragRect.Y, dragRect.Width, dragRect.Height);
+                }
+            }
+
+            // Hyperspace targeting mode: purple line from ships' center to mouse
+            if (_hyperspaceMode && _hyperspaceMouseSc != Point.Empty)
+            {
+                var hsCaptains = selectedShips.Where(s => s.IsAlive && IsHyperspaceCapable(s.Type)).ToList();
+                if (hsCaptains.Count > 0)
+                {
+                    float cx = hsCaptains.Average(s => (s.Position.X + cameraOffset.X) * zoom);
+                    float cy = hsCaptains.Average(s => (s.Position.Y + cameraOffset.Y) * zoom);
+
+                    var worldDest  = ScreenToWorld(_hyperspaceMouseSc);
+                    var hsPass     = world.Ships.Where(s => s.IsAlive && s.IsPlayerOwned
+                                        && IsLightShip(s.Type)
+                                        && hsCaptains.Any(c => Dist(c.Position, s.Position) <= GameConstants.DockRange))
+                                        .ToList();
+                    int cost       = CalcHyperspaceCost(hsCaptains, hsPass, worldDest);
+                    bool canAfford = world.PlayerResources >= cost;
+
+                    using (var pen = new Pen(Color.FromArgb(180, Color.MediumPurple), 2f) { DashStyle = DashStyle.Dash })
+                        g.DrawLine(pen, cx, cy, _hyperspaceMouseSc.X, _hyperspaceMouseSc.Y);
+
+                    string hsLabel  = $"Jump: {cost} res";
+                    Color labelCol  = canAfford ? Color.MediumPurple : Color.OrangeRed;
+                    using (var brush = new SolidBrush(labelCol))
+                    using (var font  = new Font("Consolas", 9f))
+                        g.DrawString(hsLabel, font, brush, _hyperspaceMouseSc.X + 12, _hyperspaceMouseSc.Y - 10);
                 }
             }
 
@@ -1242,10 +1278,19 @@ namespace FleetCommand
                     e.Handled = true;
                     break;
                 case Keys.Escape:
+                    if (_hyperspaceMode) { _hyperspaceMode = false; break; }
                     if (world.State != GameState.Playing) { ReturnToMenu(); break; }
                     foreach (var s in selectedShips) { s.IsSelected = false; s.AttackTarget = null; }
                     foreach (var s in world.Ships) s.IsTargeted = false;
                     selectedShips.Clear();
+                    break;
+                case Keys.H:
+                    if (world.State != GameState.Playing) break;
+                    var jumpable = selectedShips.Where(s => s.IsAlive && IsHyperspaceCapable(s.Type)).ToList();
+                    if (jumpable.Count > 0 && !_hyperspaceMode)
+                        _hyperspaceMode = true;
+                    else
+                        _hyperspaceMode = false;
                     break;
                 case Keys.A:
                     if (e.Control)
@@ -1362,6 +1407,30 @@ namespace FleetCommand
 
                 if (!wasPanning)
                 {
+                    // ── Hyperspace jump destination confirmation ───────────────
+                    if (_hyperspaceMode)
+                    {
+                        _hyperspaceMode = false;
+                        var destPt   = ScreenToWorld(e.Location);
+                        var captains = selectedShips.Where(s => s.IsAlive && IsHyperspaceCapable(s.Type)).ToList();
+                        var passengers = new List<Ship>();
+                        foreach (var cap in captains)
+                            passengers.AddRange(world.Ships.Where(s => s.IsAlive && s.IsPlayerOwned
+                                && IsLightShip(s.Type) && Dist(s.Position, cap.Position) <= GameConstants.DockRange));
+                        int totalCost = CalcHyperspaceCost(captains, passengers, destPt);
+                        if (world.PlayerResources >= totalCost && captains.Count > 0)
+                        {
+                            world.PlayerResources -= totalCost;
+                            foreach (var cap in captains)
+                            {
+                                var myPass = passengers.Where(p => Dist(p.Position, cap.Position) <= GameConstants.DockRange).ToList();
+                                StartHyperspaceJump(cap, destPt, myPass);
+                            }
+                            world.LogEvent($"Hyperspace jump initiated! Cost: {totalCost} res");
+                        }
+                        return;
+                    }
+
                     var worldPt = ScreenToWorld(e.Location);
 
                     var enemy = world.Ships.Where(s => !s.IsPlayerOwned && s.IsAlive)
@@ -1527,6 +1596,7 @@ namespace FleetCommand
 
 		private void OnMouseMove(object sender, MouseEventArgs e)
         {
+            if (_hyperspaceMode) _hyperspaceMouseSc = e.Location;
 
 			if (dragStart.HasValue && e.Button == MouseButtons.Left)
             {
@@ -1576,6 +1646,103 @@ namespace FleetCommand
 
         private PointF ScreenToWorld(Point p) =>
             new PointF(p.X / zoom - cameraOffset.X, p.Y / zoom - cameraOffset.Y);
+
+        private static float Dist(PointF a, PointF b)
+        {
+            float dx = a.X - b.X, dy = a.Y - b.Y;
+            return (float)Math.Sqrt(dx * dx + dy * dy);
+        }
+
+        private static bool IsHyperspaceCapable(ShipType t) =>
+            t == ShipType.Mothership || t == ShipType.Frigate || t == ShipType.Destroyer ||
+            t == ShipType.Battlecruiser || t == ShipType.Carrier;
+
+        private static bool IsLightShip(ShipType t) =>
+            t == ShipType.Interceptor || t == ShipType.Bomber || t == ShipType.Corvette;
+
+        private int CalcHyperspaceCost(List<Ship> captains, List<Ship> passengers, PointF dest)
+        {
+            int total = 0;
+            foreach (var s in captains.Cast<Ship>().Concat(passengers))
+            {
+                float dist = Dist(s.Position, dest);
+                total += Math.Max(GameConstants.HyperspaceMinCost, (int)(dist / GameConstants.HyperspaceBaseDivisor));
+            }
+            return total;
+        }
+
+        private static void StartHyperspaceJump(Ship captain, PointF dest, List<Ship> passengers)
+        {
+            captain.IsHyperspaceJumping   = true;
+            captain.HyperspaceDeparting   = true;
+            captain.HyperspaceProgress    = 0f;
+            captain.HyperspaceDestination = dest;
+            captain.Destination           = null;
+            captain.AttackTarget          = null;
+            captain.HyperspacePassengers.Clear();
+            captain.HyperspacePassengers.AddRange(passengers);
+
+            foreach (var p in passengers)
+            {
+                p.IsHyperspaceJumping = true;
+                p.HyperspaceDeparting = true;
+                p.HyperspaceProgress  = 0f;
+                p.HyperspaceCaptain   = captain;
+                p.Destination         = null;
+                p.AttackTarget        = null;
+            }
+        }
+
+        private void DrawHyperspaceShip(Graphics g, Ship ship, PointF offset, float zoom)
+        {
+            // Passengers sync to their captain's animation progress
+            var leader    = ship.HyperspaceCaptain ?? ship;
+            float progress  = leader.HyperspaceProgress;
+            bool  departing = leader.HyperspaceDeparting;
+
+            float sx = (ship.Position.X + offset.X) * zoom;
+            float sy = (ship.Position.Y + offset.Y) * zoom;
+            float r  = ship.HyperspaceRadius * zoom;
+
+            float lineX, lineHalfH;
+            bool  clipLeft;
+
+            if (departing)
+            {
+                float expandT = Math.Min(1f, progress / 0.15f);
+                float sweepT  = Math.Max(0f, (progress - 0.15f) / 0.85f);
+                lineX     = sx + r - r * 2f * sweepT;
+                lineHalfH = r * 1.5f * expandT;
+                clipLeft  = true;
+            }
+            else
+            {
+                float sweepT  = Math.Min(1f, progress / 0.85f);
+                float shrinkT = Math.Max(0f, (progress - 0.85f) / 0.15f);
+                lineX     = sx + r - r * 2f * sweepT;
+                lineHalfH = r * 1.5f * (1f - shrinkT);
+                clipLeft  = false;
+            }
+
+            float panelW = ClientSize.Width;
+            float panelH = ClientSize.Height;
+            RectangleF clipRect = clipLeft
+                ? new RectangleF(0, 0, lineX, panelH)
+                : new RectangleF(lineX, 0, panelW - lineX, panelH);
+
+            var prevClip = g.Clip;
+            g.IntersectClip(clipRect);
+            ship.Draw(g, offset, zoom);
+            g.Clip = prevClip;
+
+            if (lineHalfH > 0.5f)
+            {
+                using (var glow = new Pen(Color.FromArgb(60, Color.DeepSkyBlue), 6f))
+                    g.DrawLine(glow, lineX, sy - lineHalfH, lineX, sy + lineHalfH);
+                using (var pen = new Pen(Color.DeepSkyBlue, 2f))
+                    g.DrawLine(pen, lineX, sy - lineHalfH, lineX, sy + lineHalfH);
+            }
+        }
 
         private RectangleF ScreenRectToWorld(RectangleF r)
         {

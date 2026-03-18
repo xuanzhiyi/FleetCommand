@@ -37,6 +37,7 @@ namespace FleetCommand
         {
             Label = "Mothership";
         }
+        public override float HyperspaceRadius { get; } = 55f;
 
         public override void Draw(Graphics g, PointF offset, float zoom)
         {

@@ -8,6 +8,7 @@ namespace FleetCommand
     public class Battlecruiser : Ship
     {
         public Battlecruiser(PointF position, bool isPlayer) : base(ShipType.Battlecruiser, position, isPlayer) { Label = "Battlecruiser"; }
+        public override float HyperspaceRadius { get; } = 38f;
 
         // ── Sprite support ────────────────────────────────────────────────────
         private static Bitmap _sprite;

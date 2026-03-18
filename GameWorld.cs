@@ -180,7 +180,10 @@ namespace FleetCommand
             foreach (var ship in Ships.Where(s => s.IsAlive).ToList())
             {
                 ship.DeltaMs = deltaMs;
-                ship.Update(Ships, Asteroids, PlayerMothership);
+                if (ship.IsHyperspaceJumping)
+                    UpdateHyperspaceShip(ship, deltaMs);
+                else
+                    ship.Update(Ships, Asteroids, PlayerMothership);
             }
 
             // ── Player miner deposits ─────────────────────────────────────────
@@ -712,6 +715,36 @@ namespace FleetCommand
             }
             // Fallback: centre of the zone
             return new PointF((xMin + xMax) / 2f, (yMin + yMax) / 2f);
+        }
+
+        private void UpdateHyperspaceShip(Ship ship, int deltaMs)
+        {
+            // Passengers are driven by the captain; skip them here
+            if (ship.HyperspaceCaptain != null) return;
+
+            float speed = 1.0f / 1500f;   // 1.5 s per phase
+            ship.HyperspaceProgress += speed * deltaMs;
+
+            if (ship.HyperspaceDeparting && ship.HyperspaceProgress >= 1.0f)
+            {
+                ship.Position = ship.HyperspaceDestination.Value;
+                foreach (var p in ship.HyperspacePassengers)
+                    p.Position = ship.HyperspaceDestination.Value;
+                ship.HyperspaceDeparting = false;
+                ship.HyperspaceProgress  = 0f;
+            }
+            else if (!ship.HyperspaceDeparting && ship.HyperspaceProgress >= 1.0f)
+            {
+                ship.IsHyperspaceJumping  = false;
+                ship.HyperspaceProgress   = 0f;
+                ship.HyperspaceDestination = null;
+                foreach (var p in ship.HyperspacePassengers)
+                {
+                    p.IsHyperspaceJumping = false;
+                    p.HyperspaceCaptain   = null;
+                }
+                ship.HyperspacePassengers.Clear();
+            }
         }
 
         private float Dist(PointF a, PointF b)

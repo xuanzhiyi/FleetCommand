@@ -35,6 +35,8 @@ namespace FleetCommand
             ShipType.Worker,
         };
 
+        public override float HyperspaceRadius { get; } = 44f;
+
         public Carrier(PointF position, bool isPlayer)
             : base(ShipType.Carrier, position, isPlayer)
         {

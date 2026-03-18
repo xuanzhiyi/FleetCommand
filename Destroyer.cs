@@ -8,6 +8,7 @@ namespace FleetCommand
     public class Destroyer : Ship
     {
         public Destroyer(PointF position, bool isPlayer) : base(ShipType.Destroyer, position, isPlayer) { Label = "Destroyer"; }
+        public override float HyperspaceRadius { get; } = 28f;
 
         // ── Sprite support ────────────────────────────────────────────────────
         // Loaded once per process, shared across all Destroyer instances.

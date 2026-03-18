@@ -86,6 +86,9 @@ namespace FleetCommand
         public const float DockRepairRate        = 15.0f;
         public const float DockRange             = 60f;
 
+        public const float HyperspaceBaseDivisor = 50f;
+        public const int   HyperspaceMinCost     = 5;
+
         // ── Fleet caps per ship type (max ships per team) ─────────────────────
         // Indexed by ShipType: Mothership, Miner, Interceptor, Bomber, Corvet,
         //                      Frigate, Destroyer, Battlecruiser, ResourceCollector, Carrier
