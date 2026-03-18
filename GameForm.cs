@@ -1717,10 +1717,14 @@ namespace FleetCommand
             }
             else
             {
-                float sweepT  = Math.Min(1f, progress / 0.85f);
+                // 0.00–0.15: line grows from dot to full height at right edge
+                // 0.15–0.85: line sweeps left, ship materialises to its right
+                // 0.85–1.00: line shrinks back to dot at left edge
+                float expandT = Math.Min(1f, progress / 0.15f);
+                float sweepT  = Math.Max(0f, (progress - 0.15f) / 0.70f);
                 float shrinkT = Math.Max(0f, (progress - 0.85f) / 0.15f);
-                lineX     = sx + r - r * 2f * sweepT;
-                lineHalfH = r * 1.5f * (1f - shrinkT);
+                lineX     = sx + r - r * 2f * Math.Min(1f, sweepT);
+                lineHalfH = r * 1.5f * expandT * (1f - shrinkT);
                 clipLeft  = false;
             }
 
