@@ -165,6 +165,14 @@ namespace FleetCommand
                 if (!tooClose) Asteroids.Add(new Asteroid(pos));
             }
 
+            // ── Intro hyperspace arrivals ────────────────────────────────────
+            // All motherships and their workers jump in at game start
+            foreach (var ms in Ships.OfType<Mothership>().ToList())
+            {
+                var workers = Ships.Where(s => s.TeamId == ms.TeamId && s.Type == ShipType.Worker).ToList();
+                SetupIntroJump(ms, workers);
+            }
+
             LogEvent($"Game started — {count} opponent(s). Mine asteroids!");
             LogEvent($"Starting resources: {GameConstants.StartingResources}");
         }
@@ -715,6 +723,26 @@ namespace FleetCommand
             }
             // Fallback: centre of the zone
             return new PointF((xMin + xMax) / 2f, (yMin + yMax) / 2f);
+        }
+
+        private static void SetupIntroJump(Ship captain, List<Ship> passengers)
+        {
+            // Start directly in arrival phase — ship is already at destination,
+            // the animation materialises it in from the right
+            captain.IsHyperspaceJumping  = true;
+            captain.HyperspaceDeparting  = false;
+            captain.HyperspaceProgress   = 0f;
+            captain.HyperspaceDestination = null;
+            captain.HyperspacePassengers.Clear();
+            captain.HyperspacePassengers.AddRange(passengers);
+
+            foreach (var p in passengers)
+            {
+                p.IsHyperspaceJumping = true;
+                p.HyperspaceDeparting = false;
+                p.HyperspaceProgress  = 0f;
+                p.HyperspaceCaptain   = captain;
+            }
         }
 
         private void UpdateHyperspaceShip(Ship ship, int deltaMs)
