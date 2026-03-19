@@ -1658,7 +1658,8 @@ namespace FleetCommand
             t == ShipType.Battlecruiser || t == ShipType.Carrier;
 
         private static bool IsLightShip(ShipType t) =>
-            t == ShipType.Interceptor || t == ShipType.Bomber || t == ShipType.Corvette;
+            t == ShipType.Interceptor || t == ShipType.Bomber || t == ShipType.Corvette ||
+            t == ShipType.Worker;
 
         private int CalcHyperspaceCost(List<Ship> captains, List<Ship> passengers, PointF dest)
         {
