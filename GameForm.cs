@@ -50,6 +50,8 @@ namespace FleetCommand
         private ListBox eventLog;
         private Label _eventLogSep;
         private PictureBox _miniMapBox;
+        // Selection group hit-rects for bottom-left panel (rebuilt every paint, checked on click)
+        private readonly List<(ShipType Type, RectangleF Rect)> _selectionHitRects = new List<(ShipType, RectangleF)>();
         private const int MiniMapW = 330, MiniMapH = 220; // ≈ 6000:4000 world ratio
         private Label buildQueueLabel;
         private ProgressBar buildProgress;
@@ -1209,6 +1211,12 @@ namespace FleetCommand
                 using (var font = new Font("Consolas", 8))
                     g.DrawString("RClick enemy=ATTACK  |  RClick space=MOVE  |  RClick asteroid=MINE",
                         font, new SolidBrush(Color.FromArgb(120, Color.LightGray)), 10, ClientSize.Height - 22);
+
+                DrawSelectionGroups(g);
+            }
+            else
+            {
+                _selectionHitRects.Clear();
             }
         }
 
@@ -1343,6 +1351,18 @@ namespace FleetCommand
             }
             if (e.Button == MouseButtons.Left)
             {
+                // Check selection group panel hit-rects first
+                foreach (var (type, rect) in _selectionHitRects)
+                {
+                    if (rect.Contains(e.Location))
+                    {
+                        foreach (var sh in selectedShips.Where(sh => sh.Type != type))
+                            sh.IsSelected = false;
+                        selectedShips = selectedShips.Where(sh => sh.Type == type).ToList();
+                        Invalidate();
+                        return;
+                    }
+                }
                 var worldPt = ScreenToWorld(e.Location);
                 var clicked = world.Ships.Where(s => s.IsPlayerOwned && s.IsAlive)
                     .FirstOrDefault(s => s.HitTest(worldPt, GetShipHitRadius(s.Type)));
@@ -1784,6 +1804,55 @@ namespace FleetCommand
         {
             gameTimer?.Stop(); StopMusic();
             base.OnFormClosed(e);
+        }
+
+        // ── Selection group panel (drawn directly in OnPaint, no WinForms control) ──
+
+        private void DrawSelectionGroups(Graphics g)
+        {
+            _selectionHitRects.Clear();
+            if (selectedShips.Count < 2) return;
+
+            var groups = selectedShips
+                .GroupBy(s => s.Type)
+                .OrderBy(grp => (int)grp.Key)
+                .ToList();
+
+            using (var font    = new Font("Consolas", 9f, FontStyle.Bold))
+            using (var bgBrush = new SolidBrush(Color.FromArgb(190, 10, 10, 25)))
+            using (var fgBrush = new SolidBrush(Color.LightCyan))
+            {
+                const int padX = 10, padY = 6, gapX = 16;
+                float entryH = font.GetHeight(g) + padY * 2;
+
+                // Measure total width
+                float totalW = padX;
+                var sizes = new List<SizeF>();
+                foreach (var grp in groups)
+                {
+                    var sz = g.MeasureString($"{grp.Key} x{grp.Count()}", font);
+                    sizes.Add(sz);
+                    totalW += sz.Width + gapX;
+                }
+                totalW += padX - gapX; // remove trailing gap, add right pad
+
+                float panelY = ClientSize.Height - entryH - 35;
+                float panelX = 10;
+
+                // Background
+                g.FillRectangle(bgBrush, panelX, panelY, totalW, entryH);
+
+                // Labels + hit-rects
+                float cx = panelX + padX;
+                for (int i = 0; i < groups.Count; i++)
+                {
+                    var sz  = sizes[i];
+                    var rc  = new RectangleF(cx, panelY, sz.Width, entryH);
+                    _selectionHitRects.Add((groups[i].Key, rc));
+                    g.DrawString($"{groups[i].Key} x{groups[i].Count()}", font, fgBrush, cx, panelY + padY);
+                    cx += sz.Width + gapX;
+                }
+            }
         }
 
         // ── Helpers ────────────────────────────────────────────────────────────
