@@ -32,6 +32,9 @@ namespace FleetCommand
         // Combat targeting
         public Ship AttackTarget { get; set; }
 
+        // Prevents double-triggering the death explosion effect
+        public bool DeathEffectTriggered { get; set; } = false;
+
         // Repair state — set by GameWorld each tick
         public bool IsDocking { get; set; }
 

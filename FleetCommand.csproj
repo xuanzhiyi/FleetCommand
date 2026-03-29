@@ -124,6 +124,7 @@
     <Content Include="Resources\Destroyer.jpg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <EmbeddedResource Include="Resources\explosion.mp3" />
     <Content Include="Resources\Frigate.jpg">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

@@ -93,6 +93,7 @@ namespace FleetCommand
 		private Bitmap wp;
 
         private IWavePlayer outputDevice;
+        private IWavePlayer _explosionDevice;   // separate device so it doesn't interrupt music
 
         private Boolean _IsDebug = false;
 
@@ -148,6 +149,25 @@ namespace FleetCommand
         {
             try { outputDevice?.Stop(); } catch { }
             outputDevice = null;
+        }
+
+        private void PlayExplosionSound()
+        {
+            try
+            {
+                var stream = System.Reflection.Assembly.GetExecutingAssembly()
+                    .GetManifestResourceStream("FleetCommand.Resources.explosion.mp3");
+                if (stream == null) return;
+
+                // Stop and dispose previous one-shot playback before starting a new one
+                try { _explosionDevice?.Stop(); _explosionDevice?.Dispose(); } catch { }
+
+                var reader = new Mp3FileReader(stream);
+                _explosionDevice = new WaveOutEvent();
+                _explosionDevice.Init(reader);
+                _explosionDevice.Play();
+            }
+            catch { }
         }
 
         // ── UI Construction ────────────────────────────────────────────────────
@@ -725,6 +745,8 @@ namespace FleetCommand
 
                 world.Update(delta);
                 UpdateUI();
+
+                if (world.CapitalExplosionOccurred) PlayExplosionSound();
 
                 if (world.State == GameState.GameOver) ShowEndScreen(false);
                 else if (world.State == GameState.Victory) ShowEndScreen(true);

@@ -7,13 +7,14 @@ namespace FleetCommand
     // ── Combat Effect Kinds ───────────────────────────────────────────────────
     public enum CombatEffectKind
     {
-        LaserGreen,    // Corvette (player)   — instant thin laser line, green
-		LaserRed,      // Corvette (enemy)    — instant thin laser line, red
-		PlasmaBlue,    // Mothership/Carrier — wide plasma beam, blue
-        Missile,       // Interceptor       — fast-moving projectile bullet + impact flash
-        Bomb,          // Bomber            — slow projectile bomb + expanding explosion rings
-        IonCannon,     // Destroyer/BC      — wide electric arc beam, blue-white
-        FrigateShot,   // Frigate           — fast flak ball + radiating slash shrapnel
+        LaserGreen,       // Corvette (player)   — instant thin laser line, green
+		LaserRed,         // Corvette (enemy)    — instant thin laser line, red
+		PlasmaBlue,       // Mothership/Carrier — wide plasma beam, blue
+        Missile,          // Interceptor       — fast-moving projectile bullet + impact flash
+        Bomb,             // Bomber            — slow projectile bomb + expanding explosion rings
+        IonCannon,        // Destroyer/BC      — wide electric arc beam, blue-white
+        FrigateShot,      // Frigate           — fast flak ball + radiating slash shrapnel
+        CapitalExplosion, // Capital ship death — large multi-ring explosion (From == To == ship pos)
     }
 
     // ── Combat Effect ─────────────────────────────────────────────────────────
@@ -56,19 +57,28 @@ namespace FleetCommand
                 for (int i = 0; i < 5; i++)
                     _ionOffsets[i] = (float)((rng.NextDouble() - 0.5) * 10);
             }
+            // Pre-compute 10 random debris angles for capital explosion
+            if (kind == CombatEffectKind.CapitalExplosion)
+            {
+                var rng = new Random(++_seed);
+                _ionOffsets = new float[10];
+                for (int i = 0; i < 10; i++)
+                    _ionOffsets[i] = (float)(rng.NextDouble() * Math.PI * 2);
+            }
         }
 
         private static float Lifetime(CombatEffectKind k)
         {
             switch (k)
             {
-                case CombatEffectKind.Missile:     return 0.14f;
-                case CombatEffectKind.Bomb:        return 0.38f;
-                case CombatEffectKind.IonCannon:   return 0.22f;
-                case CombatEffectKind.FrigateShot: return 0.24f;
+                case CombatEffectKind.Missile:          return 0.14f;
+                case CombatEffectKind.Bomb:             return 0.38f;
+                case CombatEffectKind.IonCannon:        return 0.22f;
+                case CombatEffectKind.FrigateShot:      return 0.24f;
                 case CombatEffectKind.LaserGreen:
-                case CombatEffectKind.LaserRed:    return 0.12f;
-                default:                           return 0.18f;  // PlasmaBlue
+                case CombatEffectKind.LaserRed:         return 0.12f;
+                case CombatEffectKind.CapitalExplosion: return 2.5f;
+                default:                                return 0.18f;  // PlasmaBlue
             }
         }
 
@@ -102,6 +112,8 @@ namespace FleetCommand
                     DrawIonCannon(g, ax, ay, bx, by);              break;
                 case CombatEffectKind.FrigateShot:
                     DrawFrigateShot(g, ax, ay, bx, by);            break;
+                case CombatEffectKind.CapitalExplosion:
+                    DrawCapitalExplosion(g, bx, by);               break;
             }
         }
 
@@ -292,6 +304,79 @@ namespace FleetCommand
                     }
                     using (var pen = new Pen(Color.FromArgb(A(160, intensity), 160, 230, 255), 0.9f))
                         g.DrawLine(pen, prevX, prevY, bx, by);
+                }
+            }
+        }
+
+        // ── CAPITAL EXPLOSION (Mothership / Carrier / Battlecruiser / Destroyer / Frigate) ──
+        // Large multi-ring blast: white flash → fireball → three rings + debris.
+        private void DrawCapitalExplosion(Graphics g, float cx, float cy)
+        {
+            const float baseR = 80f;  // base radius at zoom=1
+
+            // ── Phase 1 (0→0.25): white flash — expands and fades ───────────────
+            if (Age < 0.25f)
+            {
+                float t  = Age / 0.25f;
+                float r  = baseR * 0.6f * t;
+                int   a  = A(240, 1f - t);
+                using (var b = new SolidBrush(Color.FromArgb(a, 255, 255, 240)))
+                    g.FillEllipse(b, cx - r, cy - r, r * 2, r * 2);
+            }
+
+            // ── Phase 2 (0→0.55): orange fireball ───────────────────────────────
+            if (Age < 0.55f)
+            {
+                float t   = Age / 0.55f;
+                float r   = baseR * (0.15f + t * 0.85f);
+                float fade = 1f - t;
+                using (var b = new SolidBrush(Color.FromArgb(A(200, fade), 220, 80, 10)))
+                    g.FillEllipse(b, cx - r, cy - r, r * 2, r * 2);
+                float cr = r * 0.55f;
+                using (var b = new SolidBrush(Color.FromArgb(A(190, fade), 255, 200, 60)))
+                    g.FillEllipse(b, cx - cr, cy - cr, cr * 2, cr * 2);
+            }
+
+            // ── Rings (0.05→1.0): three concentric shockwave rings ───────────────
+            // Ring 1 — slow, deep red
+            {
+                float t = Math.Max(0f, (Age - 0.05f) / 0.95f);
+                float r = baseR * 1.5f * t;
+                int   a = A(210, 1f - t);
+                using (var pen = new Pen(Color.FromArgb(a, 200, 30, 10), 3f))
+                    g.DrawEllipse(pen, cx - r, cy - r, r * 2, r * 2);
+            }
+            // Ring 2 — medium, orange
+            {
+                float t = Math.Max(0f, (Age - 0.05f) / 0.80f);
+                float r = baseR * 1.1f * Math.Min(1f, t);
+                int   a = A(220, 1f - Math.Min(1f, t));
+                using (var pen = new Pen(Color.FromArgb(a, 255, 120, 20), 2.5f))
+                    g.DrawEllipse(pen, cx - r, cy - r, r * 2, r * 2);
+            }
+            // Ring 3 — fast, yellow
+            {
+                float t = Math.Max(0f, (Age - 0.05f) / 0.55f);
+                float r = baseR * 0.7f * Math.Min(1f, t);
+                int   a = A(230, 1f - Math.Min(1f, t));
+                using (var pen = new Pen(Color.FromArgb(a, 255, 230, 80), 2f))
+                    g.DrawEllipse(pen, cx - r, cy - r, r * 2, r * 2);
+            }
+
+            // ── Debris sparks (0.05→0.75): 10 lines radiating outward ────────────
+            if (Age >= 0.05f && Age <= 0.75f && _ionOffsets != null)
+            {
+                float t    = (Age - 0.05f) / 0.70f;
+                float fade = 1f - t;
+                int   a    = A(200, fade);
+                float len  = baseR * 0.9f * t;
+                for (int i = 0; i < 10; i++)
+                {
+                    float angle = _ionOffsets[i];
+                    float ex = cx + (float)Math.Cos(angle) * len;
+                    float ey = cy + (float)Math.Sin(angle) * len;
+                    using (var pen = new Pen(Color.FromArgb(a, 255, 180, 50), 1.5f))
+                        g.DrawLine(pen, cx, cy, ex, ey);
                 }
             }
         }

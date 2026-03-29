@@ -16,6 +16,8 @@ namespace FleetCommand
         public List<EnemyController> Enemies      { get; } = new List<EnemyController>();
         public ResearchManager      Research      { get; } = new ResearchManager();
         public List<string>         EventLog      { get; } = new List<string>();
+        /// <summary>Set to true when a capital ship dies this tick; GameForm reads + resets it to play the sound.</summary>
+        public bool CapitalExplosionOccurred { get; set; } = false;
 
         // Legacy single-enemy accessor for GameForm compatibility
         public Mothership EnemyMothership => Enemies.FirstOrDefault()?.Mothership;
@@ -278,6 +280,15 @@ namespace FleetCommand
             foreach (var s in Ships)
                 if (s.AttackTarget != null && !s.AttackTarget.IsAlive)
                     s.AttackTarget = null;
+
+            // ── Capital ship death explosions ──────────────────────────────────
+            CapitalExplosionOccurred = false;
+            foreach (var s in Ships.Where(s => !s.IsAlive && !s.DeathEffectTriggered && IsCapitalShipType(s.Type)))
+            {
+                s.DeathEffectTriggered = true;
+                CombatEffects.Add(new CombatEffect(s.Position, s.Position, CombatEffectKind.CapitalExplosion));
+                CapitalExplosionOccurred = true;
+            }
 
             Ships.RemoveAll(s => !s.IsAlive && s.Type != ShipType.Mothership);
 
@@ -774,6 +785,11 @@ namespace FleetCommand
                 ship.HyperspacePassengers.Clear();
             }
         }
+
+        private static bool IsCapitalShipType(ShipType t) =>
+            t == ShipType.Mothership   || t == ShipType.Carrier      ||
+            t == ShipType.Battlecruiser || t == ShipType.Destroyer   ||
+            t == ShipType.Frigate;
 
         private float Dist(PointF a, PointF b)
         {
