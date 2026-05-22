@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(del \"C:\\\\Users\\\\xuanz\\\\source\\\\repos\\\\FleetCommand\\\\FleetCommand\\\\Ships.cs\")",
-      "Bash(dotnet build FleetCommand.csproj -c Debug)"
+      "Bash(dotnet build FleetCommand.csproj -c Debug)",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); print\\(data[0]['text']\\)\")",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
